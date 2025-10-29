@@ -1,0 +1,33 @@
+# 운영 환경 설정
+spring:
+  datasource:
+    url: ${DATABASE_URL}  # 환경변수로 관리
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+
+  jpa:
+    hibernate:
+      ddl-auto: validate  # 운영에서는 스키마 자동 변경 금지
+    show-sql: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+
+logging:
+  level:
+    com.incheon.notice: INFO
+    org.springframework: WARN
+
+# CORS 설정 (운영시 특정 도메인만 허용)
+cors:
+  allowed-origins: "https://your-frontend-domain.com"
+
+# FastAPI 크롤링 서버 URL (운영)
+crawler:
+  api:
+    url: ${CRAWLER_API_URL:http://crawler-service:8000}

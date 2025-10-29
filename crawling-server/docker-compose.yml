@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # 메인 프로젝트의 DB와 Redis를 사용하므로 postgres, redis는 주석 처리
+  # postgres:
+  #   image: postgres:15
+  #   environment:
+  #     POSTGRES_DB: school_notices
+  #     POSTGRES_USER: crawler
+  #     POSTGRES_PASSWORD: crawler123
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5433:5432"
+
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6380:6379"
+
+  # pgadmin도 메인 프로젝트 것 사용
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@admin.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin123
+  #     PGADMIN_CONFIG_SERVER_MODE: 'False'
+  #   ports:
+  #     - "5051:80"
+  #   volumes:
+  #     - pgadmin_data:/var/lib/pgadmin
+  #   depends_on:
+  #     - postgres
+
+  # adminer:
+  #   image: adminer:latest
+  #   ports:
+  #     - "8081:8080"
+  #   depends_on:
+  #     - postgres
+
+  fastapi:
+    build: ./app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    ports:
+      - "8001:8001"  # 포트 변경: 8001로 노출
+    volumes:
+      - ./app:/app
+      - ./alembic.ini:/app/alembic.ini
+    environment:
+      - CELERY_BROKER_URL=redis://host.docker.internal:6379/1
+      - CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/1
+      - SPRING_BOOT_URL=http://host.docker.internal:8080
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/incheon_notice
+      - API_KEY=${API_KEY:-secure-crawler-key-12345}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  celery-worker:
+    build: ./app
+    working_dir: /app
+    command: celery -A tasks worker --loglevel=INFO
+    volumes:
+      - ./app:/app
+      - ./alembic.ini:/app/alembic.ini
+    environment:
+      - CELERY_BROKER_URL=redis://host.docker.internal:6379/1
+      - CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/1
+      - SPRING_BOOT_URL=http://host.docker.internal:8080
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/incheon_notice
+
+  celery-beat:
+    build: ./app
+    working_dir: /app
+    command: celery -A tasks beat --loglevel=INFO
+    volumes:
+      - ./app:/app
+      - ./alembic.ini:/app/alembic.ini
+    environment:
+      - CELERY_BROKER_URL=redis://host.docker.internal:6379/1
+      - CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/1
+      - SPRING_BOOT_URL=http://host.docker.internal:8080
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/incheon_notice
+
+  flower:
+    build: ./app
+    working_dir: /app
+    command: celery -A tasks flower --port=5555
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./app:/app
+    environment:
+      - CELERY_BROKER_URL=redis://host.docker.internal:6379/1
+      - CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/1
+      - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/incheon_notice
+    depends_on:
+      - celery-worker
+      - celery-beat
+
+# volumes는 더 이상 필요 없음
+# volumes:
+#   postgres_data:
+#   pgadmin_data:

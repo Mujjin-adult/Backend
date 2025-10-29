@@ -1,0 +1,11 @@
+# 개발 환경 설정
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update  # 테이블 자동 생성/수정
+    show-sql: true
+
+logging:
+  level:
+    com.incheon.notice: DEBUG
+    org.springframework.security: DEBUG

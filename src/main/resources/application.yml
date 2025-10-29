@@ -1,0 +1,76 @@
+spring:
+  application:
+    name: incheon-notice-backend
+
+  # 프로필 설정 (dev: 개발환경, prod: 운영환경)
+  profiles:
+    active: dev
+
+  # 데이터베이스 설정 (PostgreSQL)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/incheon_notice
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  # JPA 설정
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update  # 개발시 update, 운영시 validate로 변경
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+
+  # Redis 설정 (캐싱용)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: # Redis 비밀번호가 있다면 여기에 입력
+      timeout: 3000ms
+
+# JWT 설정
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-change-this-in-production-minimum-256-bits}  # 환경변수로 관리 권장
+  expiration: 86400000  # 24시간 (밀리초 단위)
+  refresh-expiration: 604800000  # 7일
+
+# FastAPI 크롤링 서버 URL
+crawler:
+  api:
+    url: http://localhost:8000  # FastAPI 서버 주소
+
+# FCM (Firebase Cloud Messaging) 설정
+fcm:
+  credentials-path: ${FCM_CREDENTIALS_PATH:./firebase-credentials.json}  # Firebase 서비스 계정 키 파일 경로
+
+# 서버 포트
+server:
+  port: 8080
+
+# Actuator 설정 (모니터링)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# 로깅 설정
+logging:
+  level:
+    com.incheon.notice: DEBUG
+    org.springframework.web: INFO
+    org.hibernate: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
