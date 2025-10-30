@@ -62,6 +62,7 @@ def create_or_update_notice(db: Session, notice_data: Dict[str, Any]) -> tuple[N
 
     else:
         # 새로 생성
+        now = datetime.now()
         new_notice = Notice(
             title=notice_data.get("title"),
             content=notice_data.get("content", ""),
@@ -74,6 +75,8 @@ def create_or_update_notice(db: Session, notice_data: Dict[str, Any]) -> tuple[N
             is_important=notice_data.get("is_important", False),
             is_pinned=False,
             attachments=notice_data.get("attachments"),
+            created_at=now,
+            updated_at=now,
         )
 
         db.add(new_notice)
