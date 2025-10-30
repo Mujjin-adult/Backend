@@ -75,6 +75,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean shouldNotFilter(String path) {
         return path.startsWith("/api/auth/") ||
                path.startsWith("/api/crawler/") ||  // 크롤러 API
+               path.startsWith("/api/categories") ||  // 카테고리 조회 (public)
+               path.startsWith("/api/notices") ||    // 공지사항 조회 (public)
                path.startsWith("/swagger-ui/") ||
                path.startsWith("/v3/api-docs") ||
                path.startsWith("/actuator/");
