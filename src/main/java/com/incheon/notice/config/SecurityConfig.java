@@ -90,9 +90,6 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()  // Swagger
                         .requestMatchers("/actuator/**").permitAll()  // Actuator (운영 환경에서는 제한 필요)
 
-                        // 크롤러 API (내부 통신용, 운영 환경에서는 IP 제한 필요)
-                        .requestMatchers("/api/crawler/**").permitAll()
-
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )
