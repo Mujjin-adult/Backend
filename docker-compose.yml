@@ -62,18 +62,31 @@ services:
       retries: 3
       start_period: 40s
 
-  # FastAPI 크롤러
-  crawler:
-    build:
-      context: ./crawler-service
-      dockerfile: Dockerfile
-    container_name: incheon-notice-crawler
-    ports:
-      - "8000:8000"
-    environment:
-      BACKEND_URL: http://backend:8080
-    depends_on:
-      - backend
+  # FastAPI 크롤러 (크롤링 서버와 통합)
+  # 주의: 크롤링 서버는 crawling-server/docker-compose.yml에서 별도 관리
+  # 필요시 아래 주석 해제하여 메인 docker-compose에서도 실행 가능
+  #
+  # crawler:
+  #   build:
+  #     context: ./crawling-server/app
+  #     dockerfile: Dockerfile
+  #   container_name: incheon-notice-crawler
+  #   ports:
+  #     - "8001:8000"
+  #   environment:
+  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/incheon_notice
+  #     CELERY_BROKER_URL: redis://redis:6379/0
+  #     CELERY_RESULT_BACKEND: redis://redis:6379/0
+  #   volumes:
+  #     - ./crawling-server/app:/app
+  #     - ./crawling-server/.env:/app/.env
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - incheon-notice-network
 
   # pgAdmin (PostgreSQL 관리 도구)
   pgadmin:
