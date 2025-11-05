@@ -9,3 +9,6 @@ scrape_configs:
       - targets: ['backend:8080']
         labels:
           application: 'incheon-notice-backend'
+  - job_name: 'celery'
+    static_configs:
+      - targets: ['celery-exporter:9808']
