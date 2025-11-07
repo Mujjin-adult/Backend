@@ -63,17 +63,17 @@ services:
       start_period: 40s
 
   # FastAPI 크롤러
-  crawler:
-    build:
-      context: ./crawling-server/app
-      dockerfile: Dockerfile
-    container_name: incheon-notice-crawler
-    ports:
-      - "8000:8000"
-    environment:
-      BACKEND_URL: http://backend:8080
-    depends_on:
-      - backend
+  # crawler:
+  #   build:
+  #     context: ./crawling-server/app
+  #     dockerfile: Dockerfile
+  #   container_name: incheon-notice-crawler
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     BACKEND_URL: http://backend:8080
+  #   depends_on:
+  #     - backend
 
   # pgAdmin (PostgreSQL 관리 도구)
   pgadmin:
