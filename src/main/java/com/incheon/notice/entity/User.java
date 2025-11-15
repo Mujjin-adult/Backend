@@ -49,6 +49,18 @@ public class User extends BaseEntity {
     @Builder.Default
     private Boolean isActive = true;  // 활성 상태
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean darkMode = false;  // 다크 모드 설정
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean systemNotificationEnabled = true;  // 시스템 알림 허용/미허용
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isEmailVerified = false;  // 이메일 인증 여부
+
     // 사용자가 저장한 북마크 목록 (양방향 관계)
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -79,6 +91,46 @@ public class User extends BaseEntity {
     public void updateInfo(String name, String email) {
         this.name = name;
         this.email = email;
+    }
+
+    /**
+     * 다크 모드 설정 변경
+     */
+    public void updateDarkMode(Boolean darkMode) {
+        this.darkMode = darkMode;
+    }
+
+    /**
+     * 시스템 알림 설정 변경
+     */
+    public void updateSystemNotification(Boolean enabled) {
+        this.systemNotificationEnabled = enabled;
+    }
+
+    /**
+     * 사용자 설정 일괄 업데이트
+     */
+    public void updateSettings(Boolean darkMode, Boolean systemNotificationEnabled) {
+        if (darkMode != null) {
+            this.darkMode = darkMode;
+        }
+        if (systemNotificationEnabled != null) {
+            this.systemNotificationEnabled = systemNotificationEnabled;
+        }
+    }
+
+    /**
+     * 계정 비활성화
+     */
+    public void deactivate() {
+        this.isActive = false;
+    }
+
+    /**
+     * 이메일 인증 완료 처리
+     */
+    public void verifyEmail() {
+        this.isEmailVerified = true;
     }
 }
 

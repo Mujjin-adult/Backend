@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 공지사항 엔티티
@@ -64,10 +62,8 @@ public class Notice extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String attachments;
 
-    // 이 공지사항을 북마크한 사용자 목록
-    @OneToMany(mappedBy = "notice", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Bookmark> bookmarks = new ArrayList<>();
+    // Note: bookmarks는 CrawlNotice 엔티티를 사용합니다.
+    // Notice는 레거시 엔티티이며, 실제 북마크는 CrawlNotice와 연결됩니다.
 
     /**
      * 조회수 업데이트

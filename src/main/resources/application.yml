@@ -36,6 +36,28 @@ spring:
       password: # Redis 비밀번호가 있다면 여기에 입력
       timeout: 3000ms
 
+  # Email 설정 (SMTP - Gmail 예시)
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:your-email@gmail.com}  # 환경변수로 관리 권장
+    password: ${MAIL_PASSWORD:your-app-password}  # Gmail 앱 비밀번호
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# 앱 설정
+app:
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:3000}  # 프론트엔드 URL
+
 # JWT 설정
 jwt:
   secret: ${JWT_SECRET:your-secret-key-change-this-in-production-minimum-256-bits}  # 환경변수로 관리 권장
@@ -74,3 +96,14 @@ logging:
     org.hibernate: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Swagger/OpenAPI 설정
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+    tryItOutEnabled: true

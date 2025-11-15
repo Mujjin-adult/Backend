@@ -102,4 +102,38 @@ public class AuthDto {
         private String name;
         private String role;
     }
+
+    /**
+     * 비밀번호 찾기 요청 DTO
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ForgotPasswordRequest {
+
+        @NotBlank(message = "이메일은 필수입니다")
+        @Email(message = "올바른 이메일 형식이 아닙니다")
+        private String email;
+    }
+
+    /**
+     * 비밀번호 재설정 요청 DTO
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ResetPasswordRequest {
+
+        @NotBlank(message = "토큰은 필수입니다")
+        private String token;
+
+        @NotBlank(message = "새 비밀번호는 필수입니다")
+        @Size(min = 8, max = 50, message = "비밀번호는 8~50자이어야 합니다")
+        private String newPassword;
+
+        @NotBlank(message = "비밀번호 확인은 필수입니다")
+        private String confirmPassword;
+    }
 }
