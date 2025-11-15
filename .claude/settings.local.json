@@ -6,7 +6,17 @@
       "Bash(curl:*)",
       "Bash(docker-compose logs:*)",
       "Bash(docker exec:*)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "Bash(find:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(./gradlew clean build:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(chmod:*)",
+      "Bash(/Users/chosunghoon/Desktop/Incheon_univ_noti_app/test_apis.sh)",
+      "Bash(/Users/chosunghoon/Desktop/Incheon_univ_noti_app/comprehensive_api_test.sh)",
+      "Bash(TOKEN='eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0ZXN0QGludS5hYy5rciIsImlhdCI6MTc2MzE5NTkwNSwiZXhwIjoxNzYzMjgyMzA1fQ.JgYKjnyugb7plKvMtUsw4T4o-C62LnU6dmwPALjkSA4OE3kdiDBbH5V3ZdgT1Nkn1mGOknxZpRyHFU9dTg055Q')",
+      "Bash(/Users/chosunghoon/Desktop/Incheon_univ_noti_app/test_http_status_codes.sh:*)"
     ],
     "deny": [],
     "ask": []

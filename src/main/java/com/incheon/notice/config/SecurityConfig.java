@@ -87,8 +87,19 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()  // 로그인, 회원가입
                         .requestMatchers("/api/categories/**").permitAll()  // 카테고리 조회
                         .requestMatchers(HttpMethod.GET, "/api/notices/**").permitAll()  // 공지사항 조회
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()  // Swagger
+
+                        // Swagger UI 관련 경로 (모든 경로 포함)
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/swagger-resources/**",
+                                "/webjars/**",
+                                "/configuration/**"
+                        ).permitAll()
+
                         .requestMatchers("/actuator/**").permitAll()  // Actuator (운영 환경에서는 제한 필요)
+                        .requestMatchers("/error").permitAll()  // Spring Boot 에러 페이지
 
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()

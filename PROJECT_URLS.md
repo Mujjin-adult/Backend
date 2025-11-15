@@ -28,7 +28,7 @@
 
 ## 🔐 접속 정보
 
-### pgAdmin (http://localhost:5050)
+3### pgAdmin (http://localhost:5050)
 - **이메일**: admin@admin.com
 - **비밀번호**: admin
 

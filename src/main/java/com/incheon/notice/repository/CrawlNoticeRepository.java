@@ -51,7 +51,7 @@ public interface CrawlNoticeRepository extends JpaRepository<CrawlNotice, Long> 
     /**
      * 제목이나 내용에 키워드가 포함된 공지사항 검색
      */
-    @Query("SELECT cn FROM CrawlNotice cn WHERE cn.title LIKE %:keyword% OR cn.content LIKE %:keyword% ORDER BY cn.publishedAt DESC")
+    @Query("SELECT cn FROM CrawlNotice cn WHERE cn.title LIKE CONCAT('%', :keyword, '%') OR cn.content LIKE CONCAT('%', :keyword, '%') ORDER BY cn.publishedAt DESC")
     Page<CrawlNotice> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     /**

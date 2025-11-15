@@ -42,7 +42,7 @@ public interface NoticeRepository extends JpaRepository<Notice, Long> {
     /**
      * 제목이나 내용에 키워드가 포함된 공지사항 검색
      */
-    @Query("SELECT n FROM Notice n WHERE n.title LIKE %:keyword% OR n.content LIKE %:keyword% ORDER BY n.publishedAt DESC")
+    @Query("SELECT n FROM Notice n WHERE n.title LIKE CONCAT('%', :keyword, '%') OR n.content LIKE CONCAT('%', :keyword, '%') ORDER BY n.publishedAt DESC")
     Page<Notice> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     /**

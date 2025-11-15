@@ -76,9 +76,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return path.startsWith("/api/auth/") ||
                path.startsWith("/api/categories") ||  // 카테고리 조회 (public)
                path.startsWith("/api/notices") ||    // 공지사항 조회 (public)
+
+               // Swagger UI 관련 경로
                path.startsWith("/swagger-ui/") ||
+               path.startsWith("/swagger-ui.html") ||
+               path.equals("/swagger-ui.html") ||
                path.startsWith("/v3/api-docs") ||
-               path.startsWith("/actuator/");
+               path.startsWith("/swagger-resources/") ||
+               path.startsWith("/webjars/") ||
+               path.startsWith("/configuration/") ||
+
+               path.startsWith("/actuator/") ||
+               path.equals("/error");  // Spring Boot 에러 페이지
     }
 
     /**
