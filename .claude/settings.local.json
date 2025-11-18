@@ -16,7 +16,21 @@
       "Bash(/Users/chosunghoon/Desktop/Incheon_univ_noti_app/test_apis.sh)",
       "Bash(/Users/chosunghoon/Desktop/Incheon_univ_noti_app/comprehensive_api_test.sh)",
       "Bash(TOKEN='eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0ZXN0QGludS5hYy5rciIsImlhdCI6MTc2MzE5NTkwNSwiZXhwIjoxNzYzMjgyMzA1fQ.JgYKjnyugb7plKvMtUsw4T4o-C62LnU6dmwPALjkSA4OE3kdiDBbH5V3ZdgT1Nkn1mGOknxZpRyHFU9dTg055Q')",
-      "Bash(/Users/chosunghoon/Desktop/Incheon_univ_noti_app/test_http_status_codes.sh:*)"
+      "Bash(/Users/chosunghoon/Desktop/Incheon_univ_noti_app/test_http_status_codes.sh:*)",
+      "Bash(./comprehensive_api_test.sh:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(brew install:*)",
+      "Bash(git remote get-url:*)",
+      "Bash(TEST_NUM=\"99888\" echo \"=== 테스트 1: 회원가입 API ===\" echo \"이메일: swaggertest$TEST_NUM@inu.ac.kr\" echo \"\" curl -s -X POST http://localhost:8080/api/auth/signup -H \"Content-Type: application/json\" -d \"{\n    \"\"studentId\"\": \"\"2021$TEST_NUM\"\",\n    \"\"email\"\": \"\"swaggertest$TEST_NUM@inu.ac.kr\"\",\n    \"\"password\"\": \"\"testpass123\"\",\n    \"\"name\"\": \"\"Swagger테스트$TEST_NUM\"\"\n  }\")",
+      "Bash(TEST_NUM=\"99888\":*)",
+      "Bash(echo:*)",
+      "Bash(TEST_NUM=\"99888\" echo \"=== 테스트 2: 로그인 API ===\" curl -s -X POST http://localhost:8080/api/auth/login -H \"Content-Type: application/json\" -d \"{\n    \"\"email\"\": \"\"swaggertest$TEST_NUM@inu.ac.kr\"\",\n    \"\"password\"\": \"\"testpass123\"\"\n  }\")",
+      "Bash(tee:*)",
+      "Bash(/tmp/login_response.json)",
+      "Bash(cat:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

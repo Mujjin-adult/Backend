@@ -21,7 +21,10 @@ from crud import (
     get_host_statistics,
 )
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/v1",
+    responses={404: {"description": "Not found"}},
+)
 
 
 # 잡 생성 요청 스키마
@@ -38,7 +41,12 @@ class JobCreateRequest(BaseModel):
 
 
 # 잡 생성
-@router.post("/jobs")
+@router.post(
+    "/jobs",
+    tags=["크롤링 작업 관리"],
+    summary="새로운 크롤링 작업 생성",
+    description="새로운 크롤링 작업을 생성하고 스케줄에 등록합니다."
+)
 def create_job_endpoint(req: JobCreateRequest, db: Session = Depends(get_db)):
     """크롤링 잡 생성"""
     try:
@@ -79,7 +87,12 @@ def create_job_endpoint(req: JobCreateRequest, db: Session = Depends(get_db)):
 
 
 # 잡 조회
-@router.get("/jobs/{job_id}")
+@router.get(
+    "/jobs/{job_id}",
+    tags=["크롤링 작업 관리"],
+    summary="특정 크롤링 작업 조회",
+    description="ID로 특정 크롤링 작업의 상세 정보를 조회합니다."
+)
 def get_job_endpoint(job_id: int, db: Session = Depends(get_db)):
     """특정 크롤링 잡 조회"""
     job = get_job(db, job_id)
@@ -111,7 +124,12 @@ def get_job_endpoint(job_id: int, db: Session = Depends(get_db)):
 
 
 # 수동 트리거 (더 구체적인 경로를 먼저 정의)
-@router.post("/jobs/{job_id}/run")
+@router.post(
+    "/jobs/{job_id}/run",
+    tags=["크롤링 작업 관리"],
+    summary="크롤링 작업 수동 실행",
+    description="특정 크롤링 작업을 즉시 실행합니다 (백그라운드)."
+)
 def run_job(job_id: int, db: Session = Depends(get_db)):
     """특정 크롤링 잡 수동 실행"""
     # 잡 조회
@@ -139,7 +157,12 @@ def run_job(job_id: int, db: Session = Depends(get_db)):
 
 
 # 잡 상태 변경
-@router.post("/jobs/{job_id}/{action}")
+@router.post(
+    "/jobs/{job_id}/{action}",
+    tags=["크롤링 작업 관리"],
+    summary="크롤링 작업 상태 변경",
+    description="크롤링 작업을 일시정지(pause), 재개(resume), 취소(cancel)합니다."
+)
 def job_action(job_id: int, action: str, db: Session = Depends(get_db)):
     """크롤링 잡 상태 변경 (pause/resume/cancel)"""
     # 유효한 액션 확인
@@ -185,69 +208,31 @@ def job_action(job_id: int, action: str, db: Session = Depends(get_db)):
         )
 
 
-# 추출 결과 검색
-@router.get("/docs")
+# 작업 ID 및 카테고리로 문서 검색
+@router.get(
+    "/docs",
+    tags=["문서 관리"],
+    summary="문서 검색 (고급)",
+    description="작업 ID 또는 카테고리로 크롤링된 문서를 검색합니다."
+)
 def search_docs(
     db: Session = Depends(get_db),
-    job_id: Optional[int] = Query(None, description="Filter by job ID"),
-    url: Optional[str] = Query(None, description="Filter by URL (partial match)"),
-    q: Optional[str] = Query(None, description="Search query for title or content"),
-    limit: int = Query(50, ge=1, le=200)
+    job_id: Optional[int] = Query(None, description="작업 ID로 필터링"),
+    category: Optional[str] = Query(None, description="카테고리로 필터링 (예: 봉사, 장학금 등)"),
+    limit: int = Query(50, ge=1, le=200, description="최대 결과 수")
 ):
-    """추출된 문서 검색"""
+    """작업 ID 또는 카테고리로 문서 검색"""
     try:
-        # 기본 쿼리
-        query = text("""
-            SELECT
-                id,
-                job_id,
-                url,
-                title as title,
-                writer as writer,
-                date as date,
-                source as source,
-                category as category,
-                created_at
-            FROM crawl_notice
-            WHERE 1=1
-                {job_filter}
-                {url_filter}
-                {search_filter}
-            ORDER BY created_at DESC
-            LIMIT :limit
-        """)
-
-        # 필터 조건 추가
-        filters = []
+        base_conditions = ["1=1"]
         params = {"limit": limit}
 
         if job_id is not None:
-            filters.append("AND job_id = :job_id")
+            base_conditions.append("job_id = :job_id")
             params["job_id"] = job_id
 
-        if url:
-            filters.append("AND url ILIKE :url")
-            params["url"] = f"%{url}%"
-
-        if q:
-            filters.append("AND (title ILIKE :q OR raw ILIKE :q)")
-            params["q"] = f"%{q}%"
-
-        # 쿼리 완성
-        query_str = str(query).format(
-            job_filter=filters[0] if len(filters) > 0 and job_id else "",
-            url_filter=filters[1] if len(filters) > 1 and url else (filters[0] if url and not job_id else ""),
-            search_filter=filters[-1] if q else ""
-        )
-
-        # 간단하게 다시 작성
-        base_conditions = ["1=1"]
-        if job_id is not None:
-            base_conditions.append("job_id = :job_id")
-        if url:
-            base_conditions.append("url ILIKE :url")
-        if q:
-            base_conditions.append("(title ILIKE :q OR raw ILIKE :q)")
+        if category:
+            base_conditions.append("category ILIKE :category")
+            params["category"] = f"%{category}%"
 
         final_query = text(f"""
             SELECT
@@ -271,8 +256,7 @@ def search_docs(
         return {
             "filters": {
                 "job_id": job_id,
-                "url": url,
-                "query": q
+                "category": category
             },
             "results": [
                 {
@@ -295,13 +279,23 @@ def search_docs(
 
 
 # 헬스 체크
-@router.get("/health")
+@router.get(
+    "/health",
+    tags=["시스템 상태"],
+    summary="간단한 헬스 체크",
+    description="API 서버의 기본 상태를 확인합니다."
+)
 def health():
     return {"status": "ok"}
 
 
 # 메트릭 엔드포인트 (Prometheus)
-@router.get("/metrics")
+@router.get(
+    "/metrics",
+    tags=["모니터링"],
+    summary="Prometheus 메트릭",
+    description="시스템 메트릭을 Prometheus 형식으로 반환합니다."
+)
 def metrics(db: Session = Depends(get_db)):
     """Prometheus 메트릭 반환"""
     try:
@@ -392,24 +386,77 @@ def metrics(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to generate metrics: {str(e)}")
 
 
-@router.get("/documents")
+@router.get(
+    "/documents",
+    tags=["문서 관리"],
+    summary="전체 문서 목록 조회",
+    description="카테고리별로 크롤링된 문서를 페이징하여 조회합니다. 카테고리를 지정하지 않으면 모든 문서를 반환합니다."
+)
 def get_all_documents(
     db: Session = Depends(get_db),
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-    source: Optional[str] = Query(
-        None, description="Filter by source (e.g., volunteer, job, scholarship)"
-    ),
-    category: Optional[str] = Query(None, description="Filter by category"),
+    category: Optional[str] = Query(None, description="카테고리로 필터링 (예: 봉사, 장학금, 학점 등). 비어있으면 전체 조회"),
+    limit: int = Query(100, ge=1, le=1000, description="페이지 당 문서 수"),
+    offset: int = Query(0, ge=0, description="건너뛸 문서 수"),
 ):
-    """모든 추출된 문서 조회"""
-    documents = get_documents(
-        db, limit=limit, offset=offset, source=source, category=category
-    )
-    return {"documents": documents, "total": len(documents)}
+    """카테고리별 또는 전체 문서 조회"""
+    try:
+        # 카테고리 필터링
+        if category:
+            # 특정 카테고리만 조회
+            documents = get_documents(
+                db, skip=offset, limit=limit, category=category
+            )
+            # 전체 개수 조회
+            total_count = db.execute(
+                text("SELECT COUNT(*) FROM crawl_notice WHERE category ILIKE :category"),
+                {"category": f"%{category}%"}
+            ).scalar()
+        else:
+            # 모든 카테고리 조회
+            documents = get_documents(
+                db, skip=offset, limit=limit
+            )
+            # 전체 개수 조회
+            total_count = db.execute(
+                text("SELECT COUNT(*) FROM crawl_notice")
+            ).scalar()
+
+        return {
+            "filter": {
+                "category": category
+            },
+            "documents": [
+                {
+                    "id": doc.id,
+                    "job_id": doc.job_id,
+                    "title": doc.title,
+                    "writer": doc.writer,
+                    "date": doc.date,
+                    "hits": doc.hits,
+                    "url": doc.url,
+                    "source": doc.source,
+                    "category": doc.category,
+                    "created_at": doc.created_at,
+                }
+                for doc in documents
+            ],
+            "pagination": {
+                "offset": offset,
+                "limit": limit,
+                "returned": len(documents),
+                "total": total_count
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get documents: {str(e)}")
 
 
-@router.get("/documents/summary")
+@router.get(
+    "/documents/summary",
+    tags=["문서 관리"],
+    summary="문서 요약 통계",
+    description="소스별, 카테고리별 문서 통계 정보를 조회합니다."
+)
 def get_documents_summary(db: Session = Depends(get_db)):
     """문서 요약 통계 조회"""
     try:
@@ -458,7 +505,12 @@ def get_documents_summary(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}")
 
 
-@router.get("/documents/recent")
+@router.get(
+    "/documents/recent",
+    tags=["문서 관리"],
+    summary="최근 크롤링된 문서 조회",
+    description="최근에 크롤링된 문서 목록을 최신순으로 조회합니다."
+)
 def get_recent_documents(
     db: Session = Depends(get_db), limit: int = Query(20, ge=1, le=100)
 ):
@@ -503,63 +555,49 @@ def get_recent_documents(
         )
 
 
-@router.get("/documents/search")
-def search_documents(
+@router.get(
+    "/documents/search/title",
+    tags=["문서 관리"],
+    summary="문서 제목으로 검색",
+    description="문서의 제목에서 키워드를 검색합니다."
+)
+def search_by_title(
     db: Session = Depends(get_db),
-    q: str = Query(..., description="Search query"),
-    source: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=200),
+    q: str = Query(..., description="검색 키워드"),
+    limit: int = Query(50, ge=1, le=200, description="최대 결과 수"),
 ):
-    """문서 검색"""
+    """문서 제목 검색"""
     try:
-        # 제목이나 내용에서 검색
         search_query = f"%{q}%"
 
-        if source:
-            results = db.execute(
-                text("""
-                SELECT
-                    title as title,
-                    writer as writer,
-                    date as date,
-                    hits as hits,
-                    url,
-                    source as source,
-                    category as category,
-                    created_at
-                FROM crawl_notice
-                WHERE (title ILIKE :query OR raw ILIKE :query)
-                AND source = :source
-                ORDER BY created_at DESC
-                LIMIT :limit
-            """),
-                {"query": search_query, "source": source, "limit": limit},
-            ).fetchall()
-        else:
-            results = db.execute(
-                text("""
-                SELECT
-                    title as title,
-                    writer as writer,
-                    date as date,
-                    hits as hits,
-                    url,
-                    source as source,
-                    category as category,
-                    created_at
-                FROM crawl_notice
-                WHERE title ILIKE :query OR raw ILIKE :query
-                ORDER BY created_at DESC
-                LIMIT :limit
-            """),
-                {"query": search_query, "limit": limit},
-            ).fetchall()
+        results = db.execute(
+            text("""
+            SELECT
+                id,
+                job_id,
+                title as title,
+                writer as writer,
+                date as date,
+                hits as hits,
+                url,
+                source as source,
+                category as category,
+                created_at
+            FROM crawl_notice
+            WHERE title ILIKE :query
+            ORDER BY created_at DESC
+            LIMIT :limit
+        """),
+            {"query": search_query, "limit": limit},
+        ).fetchall()
 
         return {
+            "search_type": "title",
             "query": q,
-            "source": source,
             "results": [
                 {
+                    "id": doc.id,
+                    "job_id": doc.job_id,
                     "title": doc.title,
                     "writer": doc.writer,
                     "date": doc.date,
@@ -574,10 +612,75 @@ def search_documents(
             "total_found": len(results),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Title search failed: {str(e)}")
 
 
-@router.get("/crawling-status")
+@router.get(
+    "/documents/search/content",
+    tags=["문서 관리"],
+    summary="문서 내용으로 검색",
+    description="문서의 내용(본문)에서 키워드를 검색합니다."
+)
+def search_by_content(
+    db: Session = Depends(get_db),
+    q: str = Query(..., description="검색 키워드"),
+    limit: int = Query(50, ge=1, le=200, description="최대 결과 수"),
+):
+    """문서 내용 검색"""
+    try:
+        search_query = f"%{q}%"
+
+        results = db.execute(
+            text("""
+            SELECT
+                id,
+                job_id,
+                title as title,
+                writer as writer,
+                date as date,
+                hits as hits,
+                url,
+                source as source,
+                category as category,
+                created_at
+            FROM crawl_notice
+            WHERE raw ILIKE :query
+            ORDER BY created_at DESC
+            LIMIT :limit
+        """),
+            {"query": search_query, "limit": limit},
+        ).fetchall()
+
+        return {
+            "search_type": "content",
+            "query": q,
+            "results": [
+                {
+                    "id": doc.id,
+                    "job_id": doc.job_id,
+                    "title": doc.title,
+                    "writer": doc.writer,
+                    "date": doc.date,
+                    "hits": doc.hits,
+                    "url": doc.url,
+                    "source": doc.source,
+                    "category": doc.category,
+                    "created_at": doc.created_at,
+                }
+                for doc in results
+            ],
+            "total_found": len(results),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Content search failed: {str(e)}")
+
+
+@router.get(
+    "/crawling-status",
+    tags=["시스템 상태"],
+    summary="크롤링 작업 상태 조회",
+    description="모든 크롤링 작업의 현재 상태와 최근 활동 내역을 조회합니다."
+)
 def get_crawling_status(db: Session = Depends(get_db)):
     """크롤링 상태 및 통계 조회"""
     try:
