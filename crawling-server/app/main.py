@@ -57,8 +57,8 @@ async def lifespan(app: FastAPI):
 
 # FastAPI 앱 생성
 app = FastAPI(
-    title="College Notice Crawler API",
-    description="대학 공지사항을 수집하는 크롤링 시스템",
+    title="인천대학교 공지사항 크롤링 서버 API",
+    description="인천대학교 공지사항을 자동으로 수집하고 관리하는 크롤링 시스템",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -142,20 +142,30 @@ async def add_process_time_header(request: Request, call_next):
 
 
 # API 라우터 등록
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router)
 
 
-@app.get("/")
+@app.get(
+    "/",
+    tags=["시스템 정보"],
+    summary="API 정보 조회",
+    description="크롤링 서버의 기본 정보를 반환합니다."
+)
 async def root():
     """루트 엔드포인트"""
     return {
-        "message": "College Notice Crawler API",
+        "message": "인천대학교 공지사항 크롤링 서버 API",
         "version": "1.0.0",
         "status": "running",
     }
 
 
-@app.get("/metrics")
+@app.get(
+    "/metrics",
+    tags=["모니터링"],
+    summary="시스템 메트릭 조회",
+    description="Prometheus 형식의 시스템 메트릭을 반환합니다 (HTTP 요청, 크롤러 통계, Circuit Breaker 등)."
+)
 async def metrics():
     """
     Prometheus 메트릭 엔드포인트
@@ -169,7 +179,12 @@ async def metrics():
     return metrics_endpoint()
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["시스템 상태"],
+    summary="전체 시스템 헬스 체크",
+    description="데이터베이스, Redis, Celery Worker의 상태를 종합적으로 확인합니다."
+)
 async def health_check():
     """
     헬스 체크 엔드포인트
@@ -225,7 +240,12 @@ async def health_check():
     }
 
 
-@app.get("/test-crawlers")
+@app.get(
+    "/test-crawlers",
+    tags=["크롤러 실행"],
+    summary="크롤러 실시간 테스트",
+    description="실제 웹사이트에 접속하여 크롤러가 정상 동작하는지 테스트합니다."
+)
 async def test_crawlers():
     """크롤러 테스트 엔드포인트"""
     from auto_scheduler import get_auto_scheduler
@@ -242,7 +262,12 @@ async def test_crawlers():
         return {"status": "error", "message": f"Crawler test failed: {str(e)}"}
 
 
-@app.post("/run-crawler/{category}")
+@app.post(
+    "/run-crawler/{category}",
+    tags=["크롤러 실행"],
+    summary="카테고리별 크롤러 수동 실행",
+    description="특정 카테고리 또는 전체 카테고리의 크롤러를 즉시 실행합니다 (API Key 필요)."
+)
 async def run_crawler(
     category: str,
     api_key: str = Depends(verify_api_key)
@@ -318,7 +343,12 @@ async def run_crawler(
         return {"status": "error", "message": f"Crawler execution failed: {str(e)}"}
 
 
-@app.post("/force-schedule-update")
+@app.post(
+    "/force-schedule-update",
+    tags=["크롤러 실행"],
+    summary="스케줄 강제 업데이트",
+    description="Celery Beat 스케줄을 데이터베이스 정보와 동기화합니다."
+)
 async def force_schedule_update():
     """Celery 스케줄 강제 업데이트"""
     from auto_scheduler import get_auto_scheduler
@@ -331,7 +361,55 @@ async def force_schedule_update():
         return {"status": "error", "message": f"Schedule update failed: {str(e)}"}
 
 
-@app.get("/dashboard")
+@app.get(
+    "/test-sentry",
+    tags=["시스템 정보"],
+    summary="Sentry 연동 테스트",
+    description="Sentry와 Slack 연동을 테스트하기 위한 에러를 발생시킵니다."
+)
+async def test_sentry():
+    """Sentry 테스트 엔드포인트"""
+    from sentry_config import track_crawler_error, capture_message_with_level
+
+    # 정보 메시지 전송
+    capture_message_with_level(
+        "Sentry 연동 테스트: 정보 메시지",
+        level="info",
+        context={
+            "test_type": "info_message",
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+    # 크롤러 에러 테스트
+    track_crawler_error(
+        category="test",
+        error_type="TestError",
+        url="http://localhost:8001/test-sentry",
+        exception=Exception("🧪 Sentry와 Slack 연동 테스트입니다!"),
+        extra_data={
+            "test_purpose": "Sentry-Slack integration test",
+            "expected_result": "Slack notification should appear"
+        }
+    )
+
+    return {
+        "status": "success",
+        "message": "테스트 이벤트를 Sentry로 전송했습니다!",
+        "instructions": [
+            "1. Sentry 대시보드(https://sentry.io)에서 이벤트를 확인하세요",
+            "2. Slack 채널에서 알림을 확인하세요",
+            "3. 알림이 오지 않으면 Alert Rules를 확인하세요"
+        ]
+    }
+
+
+@app.get(
+    "/dashboard",
+    tags=["모니터링"],
+    summary="웹 대시보드",
+    description="크롤링 데이터를 시각화하는 HTML 대시보드를 제공합니다."
+)
 async def dashboard():
     """크롤링 데이터 대시보드"""
     html_content = """

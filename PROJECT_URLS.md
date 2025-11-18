@@ -13,7 +13,7 @@
 | **pgAdmin** | http://localhost:5050 | 5050 | PostgreSQL 관리 도구 |
 | **Grafana** | http://localhost:3000 | 3000 | 메인 서버 모니터링 대시보드 |
 | **Prometheus** | http://localhost:9090 | 9090 | 메인 서버 메트릭 수집 |
-
+4
 ## 📌 크롤링 서버 (crawling-server/docker-compose.yml)
 
 | 서비스 | URL | 포트 | 설명 |
