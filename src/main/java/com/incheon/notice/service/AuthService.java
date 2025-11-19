@@ -30,6 +30,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailVerificationService emailVerificationService;
+    private final EmailService emailService;
 
     /**
      * 회원가입
@@ -131,5 +132,59 @@ public class AuthService {
 
         String email = jwtTokenProvider.getEmailFromToken(refreshToken);
         return jwtTokenProvider.generateRefreshToken(email);
+    }
+
+    /**
+     * 아이디 찾기 (이름, 학번으로 이메일 찾기)
+     * 마스킹된 이메일 반환 및 전체 이메일 메일로 발송
+     */
+    @Transactional(readOnly = true)
+    public AuthDto.FindIdResponse findId(AuthDto.FindIdRequest request) {
+        // 이름과 학번으로 사용자 조회
+        User user = userRepository.findByNameAndStudentId(request.getName(), request.getStudentId())
+                .orElseThrow(() -> new BusinessException("일치하는 사용자 정보를 찾을 수 없습니다"));
+
+        String email = user.getEmail();
+
+        // 이메일 마스킹 (예: chosunghoon@inu.ac.kr → ch***@inu.ac.kr)
+        String maskedEmail = maskEmail(email);
+
+        // 이메일로 전체 이메일 주소 발송
+        try {
+            emailService.sendFindIdEmail(email);
+            log.info("아이디 찾기 이메일 발송 완료: email={}", email);
+        } catch (Exception e) {
+            log.error("아이디 찾기 이메일 발송 실패: email={}, error={}", email, e.getMessage());
+            throw new BusinessException("이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        return AuthDto.FindIdResponse.builder()
+                .maskedEmail(maskedEmail)
+                .message("입력하신 이메일 주소로 아이디가 전송되었습니다")
+                .build();
+    }
+
+    /**
+     * 이메일 마스킹 처리
+     * 예: chosunghoon@inu.ac.kr → ch***@inu.ac.kr
+     */
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return email;
+        }
+
+        String[] parts = email.split("@");
+        String localPart = parts[0];  // @  앞부분
+        String domain = parts[1];     // @ 뒤부분
+
+        // 로컬 부분 마스킹 (앞 2자리만 표시, 나머지 ***)
+        String masked;
+        if (localPart.length() <= 2) {
+            masked = localPart + "***";
+        } else {
+            masked = localPart.substring(0, 2) + "***";
+        }
+
+        return masked + "@" + domain;
     }
 }

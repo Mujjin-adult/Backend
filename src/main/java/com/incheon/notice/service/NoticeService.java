@@ -4,14 +4,21 @@ import com.incheon.notice.dto.CategoryDto;
 import com.incheon.notice.dto.NoticeDto;
 import com.incheon.notice.entity.Category;
 import com.incheon.notice.entity.Notice;
+import com.incheon.notice.entity.UserPreference;
 import com.incheon.notice.repository.CategoryRepository;
 import com.incheon.notice.repository.NoticeRepository;
+import com.incheon.notice.repository.UserPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 공지사항 서비스
@@ -24,14 +31,22 @@ public class NoticeService {
 
     private final NoticeRepository noticeRepository;
     private final CategoryRepository categoryRepository;
+    private final UserPreferenceRepository userPreferenceRepository;
 
     /**
-     * 전체 공지사항 페이징 조회
+     * 전체 공지사항 페이징 조회 (정렬 지원)
      */
-    public Page<NoticeDto.Response> getAllNotices(Pageable pageable) {
-        log.debug("전체 공지사항 조회: page={}, size={}", pageable.getPageNumber(), pageable.getPageSize());
+    public Page<NoticeDto.Response> getAllNotices(Pageable pageable, String sort) {
+        log.debug("전체 공지사항 조회: page={}, size={}, sort={}",
+                pageable.getPageNumber(), pageable.getPageSize(), sort);
 
-        Page<Notice> noticePage = noticeRepository.findAllByOrderByPublishedAtDesc(pageable);
+        Page<Notice> noticePage;
+        if ("viewCount".equalsIgnoreCase(sort)) {
+            noticePage = noticeRepository.findAllByOrderByViewCountDesc(pageable);
+        } else {
+            // 기본값은 최신순
+            noticePage = noticeRepository.findAllByOrderByPublishedAtDesc(pageable);
+        }
 
         return noticePage.map(this::toResponse);
     }
@@ -49,16 +64,52 @@ public class NoticeService {
     }
 
     /**
-     * 카테고리별 공지사항 조회
+     * 카테고리별 공지사항 조회 (정렬 지원)
      */
-    public Page<NoticeDto.Response> getNoticesByCategoryCode(String categoryCode, Pageable pageable) {
-        log.debug("카테고리별 공지사항 조회: categoryCode={}, page={}, size={}",
-                categoryCode, pageable.getPageNumber(), pageable.getPageSize());
+    public Page<NoticeDto.Response> getNoticesByCategoryCode(String categoryCode, Pageable pageable, String sort) {
+        log.debug("카테고리별 공지사항 조회: categoryCode={}, page={}, size={}, sort={}",
+                categoryCode, pageable.getPageNumber(), pageable.getPageSize(), sort);
 
         Category category = categoryRepository.findByCode(categoryCode)
                 .orElseThrow(() -> new RuntimeException("카테고리를 찾을 수 없습니다: " + categoryCode));
 
-        Page<Notice> noticePage = noticeRepository.findByCategoryOrderByPublishedAtDesc(category, pageable);
+        Page<Notice> noticePage;
+        if ("viewCount".equalsIgnoreCase(sort)) {
+            noticePage = noticeRepository.findByCategoryOrderByViewCountDesc(category, pageable);
+        } else {
+            // 기본값은 최신순
+            noticePage = noticeRepository.findByCategoryOrderByPublishedAtDesc(category, pageable);
+        }
+
+        return noticePage.map(this::toResponse);
+    }
+
+    /**
+     * 구독한 카테고리의 공지사항 조회
+     */
+    public Page<NoticeDto.Response> getSubscribedNotices(Long userId, Pageable pageable, String sort) {
+        log.debug("구독 공지사항 조회: userId={}, page={}, size={}, sort={}",
+                userId, pageable.getPageNumber(), pageable.getPageSize(), sort);
+
+        // 사용자가 구독한 카테고리 목록 조회
+        List<UserPreference> preferences = userPreferenceRepository.findByUserId(userId);
+
+        if (preferences.isEmpty()) {
+            // 구독한 카테고리가 없으면 빈 페이지 반환
+            return new PageImpl<>(Collections.emptyList(), pageable, 0);
+        }
+
+        List<Category> subscribedCategories = preferences.stream()
+                .map(UserPreference::getCategory)
+                .collect(Collectors.toList());
+
+        Page<Notice> noticePage;
+        if ("viewCount".equalsIgnoreCase(sort)) {
+            noticePage = noticeRepository.findByCategoryInOrderByViewCountDesc(subscribedCategories, pageable);
+        } else {
+            // 기본값은 최신순
+            noticePage = noticeRepository.findByCategoryInOrderByPublishedAtDesc(subscribedCategories, pageable);
+        }
 
         return noticePage.map(this::toResponse);
     }

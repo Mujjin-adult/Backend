@@ -15,11 +15,11 @@ import java.util.List;
 /**
  * 카테고리 API Controller
  */
+@Tag(name = "카테고리", description = "카테고리 목록 조회 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
-@Tag(name = "Category API", description = "카테고리 조회 API")
 public class CategoryController {
 
     private final CategoryService categoryService;

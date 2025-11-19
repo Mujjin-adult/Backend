@@ -30,7 +30,13 @@
       "Bash(/tmp/login_response.json)",
       "Bash(cat:*)",
       "Bash(docker-compose restart:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(if [ -f .env ])",
+      "Bash(then grep -E \"^SENTRY_DSN=\" .env)",
+      "Bash(else echo \".env file not found\")",
+      "Bash(fi)",
+      "Bash(tree:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []
