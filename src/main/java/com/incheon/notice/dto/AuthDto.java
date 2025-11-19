@@ -38,7 +38,7 @@ public class AuthDto {
     }
 
     /**
-     * 로그인 요청 DTO
+     * 로그인 요청 DTO (Firebase Authentication 사용)
      */
     @Getter
     @Setter
@@ -46,18 +46,14 @@ public class AuthDto {
     @AllArgsConstructor
     public static class LoginRequest {
 
-        @NotBlank(message = "이메일은 필수입니다")
-        @Email(message = "올바른 이메일 형식이 아닙니다")
-        private String email;
-
-        @NotBlank(message = "비밀번호는 필수입니다")
-        private String password;
+        @NotBlank(message = "Firebase ID Token은 필수입니다")
+        private String idToken;  // Firebase에서 발급받은 ID Token
 
         private String fcmToken;  // 선택적: 로그인 시 FCM 토큰 업데이트
     }
 
     /**
-     * 로그인 응답 DTO
+     * 로그인 응답 DTO (Firebase Authentication 사용)
      */
     @Getter
     @Setter
@@ -66,24 +62,11 @@ public class AuthDto {
     @Builder
     public static class LoginResponse {
 
-        private String accessToken;
-        private String refreshToken;
+        private String idToken;  // Firebase ID Token (클라이언트가 이미 가지고 있음)
+        @Builder.Default
         private String tokenType = "Bearer";
-        private Long expiresIn;  // 토큰 만료 시간 (초 단위)
+        private Long expiresIn;  // 토큰 만료 시간 (초 단위, 보통 3600초 = 1시간)
         private UserResponse user;
-    }
-
-    /**
-     * 토큰 갱신 요청 DTO
-     */
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class RefreshTokenRequest {
-
-        @NotBlank(message = "리프레시 토큰은 필수입니다")
-        private String refreshToken;
     }
 
     /**
