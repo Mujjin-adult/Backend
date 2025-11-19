@@ -104,6 +104,36 @@ public class AuthDto {
     }
 
     /**
+     * 아이디 찾기 요청 DTO
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FindIdRequest {
+
+        @NotBlank(message = "이름은 필수입니다")
+        private String name;
+
+        @NotBlank(message = "학번은 필수입니다")
+        private String studentId;
+    }
+
+    /**
+     * 아이디 찾기 응답 DTO
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class FindIdResponse {
+
+        private String maskedEmail;  // 마스킹된 이메일 (예: ch***@inu.ac.kr)
+        private String message;
+    }
+
+    /**
      * 비밀번호 찾기 요청 DTO
      */
     @Getter

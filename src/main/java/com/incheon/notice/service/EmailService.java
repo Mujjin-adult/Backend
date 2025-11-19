@@ -46,6 +46,26 @@ public class EmailService {
     }
 
     /**
+     * 아이디 찾기 메일 발송
+     */
+    public void sendFindIdEmail(String toEmail) {
+        log.debug("아이디 찾기 메일 발송: toEmail={}", toEmail);
+
+        String subject = "[인천대 공지사항] 아이디 찾기";
+
+        String content = String.format(
+                "아이디 찾기 요청이 접수되었습니다.\n\n" +
+                "회원가입 시 사용하신 이메일 주소는 다음과 같습니다:\n\n" +
+                "%s\n\n" +
+                "이 이메일을 사용하여 로그인하실 수 있습니다.\n\n" +
+                "본인이 요청하지 않은 경우 이 이메일을 무시해주세요.",
+                toEmail
+        );
+
+        sendEmail(toEmail, subject, content);
+    }
+
+    /**
      * 비밀번호 재설정 메일 발송
      */
     public void sendPasswordResetEmail(String toEmail, String token) {

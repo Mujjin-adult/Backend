@@ -3,6 +3,8 @@ package com.incheon.notice.controller;
 import com.incheon.notice.dto.ApiResponse;
 import com.incheon.notice.dto.AuthDto;
 import com.incheon.notice.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
  * 인증 API Controller
  * 회원가입, 로그인, 토큰 갱신
  */
+@Tag(name = "인증 및 회원관리", description = "회원가입, 로그인, 아이디/비밀번호 찾기 API")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class AuthController {
      * 회원가입
      * POST /api/auth/signup
      */
+    @Operation(summary = "회원가입", description = "인천대학교 이메일로 회원가입을 진행합니다. 가입 후 이메일 인증이 필요합니다.")
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<AuthDto.UserResponse>> signUp(
             @Valid @RequestBody AuthDto.SignUpRequest request) {
@@ -39,6 +43,7 @@ public class AuthController {
      * 로그인
      * POST /api/auth/login
      */
+    @Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인하여 JWT 토큰을 발급받습니다.")
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> login(
             @Valid @RequestBody AuthDto.LoginRequest request) {
@@ -50,6 +55,7 @@ public class AuthController {
      * 액세스 토큰 갱신
      * POST /api/auth/refresh
      */
+    @Operation(summary = "토큰 갱신", description = "리프레시 토큰으로 새로운 액세스 토큰을 발급받습니다.")
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<String>> refreshToken(
             @Valid @RequestBody AuthDto.RefreshTokenRequest request) {
@@ -65,6 +71,7 @@ public class AuthController {
      * 클라이언트에서 토큰을 삭제하면 됩니다.
      * 추후 Redis를 이용한 JWT 블랙리스트 기능을 추가할 예정입니다.
      */
+    @Operation(summary = "로그아웃", description = "로그아웃 처리를 합니다. 클라이언트에서 토큰을 삭제해야 합니다.")
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout() {
         // TODO: JWT 블랙리스트 구현 (Phase 6.1)
@@ -76,6 +83,7 @@ public class AuthController {
      * 이메일 인증
      * GET /api/auth/verify-email?token={token}
      */
+    @Operation(summary = "이메일 인증", description = "회원가입 시 발송된 이메일의 인증 링크로 이메일을 인증합니다.")
     @GetMapping("/verify-email")
     public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
         emailVerificationService.verifyEmail(token);
@@ -86,6 +94,7 @@ public class AuthController {
      * 인증 메일 재발송
      * POST /api/auth/resend-verification
      */
+    @Operation(summary = "인증 메일 재발송", description = "이메일 인증 메일을 다시 발송합니다.")
     @PostMapping("/resend-verification")
     public ResponseEntity<ApiResponse<Void>> resendVerificationEmail(@RequestParam String email) {
         emailVerificationService.resendVerificationEmail(email);
@@ -93,9 +102,22 @@ public class AuthController {
     }
 
     /**
+     * 아이디 찾기 (이름, 학번으로 이메일 찾기)
+     * POST /api/auth/find-id
+     */
+    @Operation(summary = "아이디 찾기", description = "이름과 학번으로 아이디(이메일)를 찾습니다. 마스킹된 이메일과 함께 전체 이메일이 발송됩니다.")
+    @PostMapping("/find-id")
+    public ResponseEntity<ApiResponse<AuthDto.FindIdResponse>> findId(
+            @Valid @RequestBody AuthDto.FindIdRequest request) {
+        AuthDto.FindIdResponse response = authService.findId(request);
+        return ResponseEntity.ok(ApiResponse.success("아이디 찾기 성공", response));
+    }
+
+    /**
      * 비밀번호 찾기 (재설정 메일 발송)
      * POST /api/auth/forgot-password
      */
+    @Operation(summary = "비밀번호 찾기", description = "비밀번호 재설정 링크를 이메일로 발송합니다.")
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
             @Valid @RequestBody AuthDto.ForgotPasswordRequest request) {
@@ -107,6 +129,7 @@ public class AuthController {
      * 비밀번호 재설정
      * POST /api/auth/reset-password
      */
+    @Operation(summary = "비밀번호 재설정", description = "이메일로 받은 토큰으로 새로운 비밀번호를 설정합니다.")
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @Valid @RequestBody AuthDto.ResetPasswordRequest request) {

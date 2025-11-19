@@ -370,6 +370,7 @@ async def force_schedule_update():
 async def test_sentry():
     """Sentry 테스트 엔드포인트"""
     from sentry_config import track_crawler_error, capture_message_with_level
+    from slack_notify import send_slack_alert
 
     # 정보 메시지 전송
     capture_message_with_level(
@@ -393,15 +394,63 @@ async def test_sentry():
         }
     )
 
+    # Slack 직접 알림 전송
+    slack_enabled = os.getenv("ENABLE_SLACK_NOTIFICATIONS", "false").lower() == "true"
+    slack_sent = False
+
+    if slack_enabled:
+        slack_message = (
+            "🧪 *크롤링 서버 테스트 알림*\n\n"
+            "✅ Sentry-Slack 연동 테스트가 실행되었습니다!\n\n"
+            f"• 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            "• 환경: development\n"
+            "• URL: http://localhost:8001/test-sentry\n\n"
+            "이 메시지가 보인다면 Slack 알림이 정상적으로 작동하고 있습니다! 🎉"
+        )
+        slack_sent = send_slack_alert(slack_message)
+
     return {
         "status": "success",
         "message": "테스트 이벤트를 Sentry로 전송했습니다!",
+        "slack_notification": "전송됨" if slack_sent else "비활성화 또는 실패",
         "instructions": [
             "1. Sentry 대시보드(https://sentry.io)에서 이벤트를 확인하세요",
             "2. Slack 채널에서 알림을 확인하세요",
             "3. 알림이 오지 않으면 Alert Rules를 확인하세요"
         ]
     }
+
+
+@app.get(
+    "/test-daily-report",
+    tags=["시스템 정보"],
+    summary="일일 리포트 테스트",
+    description="일일 요약 리포트를 즉시 생성하여 Slack으로 전송합니다."
+)
+async def test_daily_report():
+    """일일 리포트 테스트 엔드포인트"""
+    try:
+        from tasks import send_daily_report
+
+        # 백그라운드에서 실행
+        result = send_daily_report.apply_async()
+
+        return {
+            "status": "success",
+            "message": "일일 리포트 생성 작업이 시작되었습니다!",
+            "task_id": result.id,
+            "instructions": [
+                "1. Slack 채널에서 리포트를 확인하세요",
+                "2. 리포트에는 어제 수집된 문서 통계가 포함됩니다",
+                "3. 매일 오전 9시에 자동으로 전송됩니다"
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Failed to trigger daily report: {e}")
+        return {
+            "status": "error",
+            "message": f"일일 리포트 생성 실패: {str(e)}"
+        }
 
 
 @app.get(

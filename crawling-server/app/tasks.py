@@ -3,7 +3,7 @@ import os
 import time
 import uuid
 from celery import Celery
-from datetime import timedelta
+from datetime import timedelta, datetime
 from celery.schedules import crontab
 import hashlib
 import logging
@@ -17,6 +17,7 @@ from rate_limiter import get_rate_limiter
 from url_utils import get_duplicate_checker, get_url_normalizer
 from logging_config import log_crawler_event, log_error, log_performance
 from college_crawlers import get_college_crawler
+from slack_notify import send_slack_alert
 import json
 
 # 로거 설정
@@ -252,6 +253,32 @@ def college_crawl_task(self, job_name: str):
             f"duration={duration:.2f}s, items={total_items}, saved={saved_items}, skipped={skipped_items}",
         )
 
+        # ✅ Slack 알림: 크롤링 성공
+        slack_enabled = os.getenv("ENABLE_SLACK_NOTIFICATIONS", "false").lower() == "true"
+        if slack_enabled:
+            if saved_items > 0:
+                message = (
+                    f"✅ *크롤링 성공: {job_name}*\n\n"
+                    f"• 신규 문서: *{saved_items}개*\n"
+                    f"• 중복 건너뜀: {skipped_items}개\n"
+                    f"• 총 처리: {total_items}개\n"
+                    f"• 소요 시간: {duration:.2f}초\n"
+                    f"• 완료 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            else:
+                message = (
+                    f"ℹ️ *크롤링 완료: {job_name}*\n\n"
+                    f"• 신규 문서: 없음\n"
+                    f"• 중복 건너뜀: {skipped_items}개\n"
+                    f"• 소요 시간: {duration:.2f}초\n"
+                    f"• 완료 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+
+            try:
+                send_slack_alert(message)
+            except Exception as slack_error:
+                logger.warning(f"Failed to send Slack notification: {slack_error}")
+
         return {
             "status": "success",
             "job_name": job_name,
@@ -275,11 +302,46 @@ def college_crawl_task(self, job_name: str):
             },
         )
 
+        # ❌ Slack 알림: 크롤링 에러
+        slack_enabled = os.getenv("ENABLE_SLACK_NOTIFICATIONS", "false").lower() == "true"
+        if slack_enabled:
+            retry_count = self.request.retries
+            max_retries = self.max_retries
+
+            message = (
+                f"❌ *크롤링 실패: {job_name}*\n\n"
+                f"• 에러: `{error_msg}`\n"
+                f"• 재시도: {retry_count}/{max_retries}\n"
+                f"• 소요 시간: {duration:.2f}초\n"
+                f"• 발생 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                f"{'⚠️ 최대 재시도 횟수 도달!' if retry_count >= max_retries else '🔄 자동으로 재시도합니다...'}"
+            )
+
+            try:
+                send_slack_alert(message)
+            except Exception as slack_error:
+                logger.warning(f"Failed to send Slack notification: {slack_error}")
+
         # 재시도 로직
         try:
             self.retry(exc=exc, countdown=(2**self.request.retries) + 5)
         except self.MaxRetriesExceededError:
             log_crawler_event("MAX_RETRIES", job_name, "FAILED", f"error={error_msg}")
+
+            # 최대 재시도 실패 시 Slack 알림
+            if slack_enabled:
+                final_message = (
+                    f"🚨 *크롤링 최종 실패: {job_name}*\n\n"
+                    f"• 에러: `{error_msg}`\n"
+                    f"• 모든 재시도 실패\n"
+                    f"• 발생 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    f"⚠️ 관리자 확인이 필요합니다!"
+                )
+                try:
+                    send_slack_alert(final_message)
+                except:
+                    pass
+
             return {"status": "failed", "error": error_msg, "job_name": job_name}
 
 
@@ -512,6 +574,96 @@ def parse_static_content(content: str, url: str) -> dict:
     }
 
 
+@celery_app.task
+def send_daily_report():
+    """일일 요약 리포트 전송 (매일 오전 9시)"""
+    try:
+        logger.info("Generating daily report...")
+
+        # 어제 날짜 계산
+        from sqlalchemy import func, and_
+        yesterday = datetime.now() - timedelta(days=1)
+        yesterday_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_end = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        with get_db_context() as db:
+            # 어제 수집된 문서 통계
+            total_docs = db.query(func.count(CrawlNotice.id)).filter(
+                and_(
+                    CrawlNotice.created_at >= yesterday_start,
+                    CrawlNotice.created_at <= yesterday_end
+                )
+            ).scalar() or 0
+
+            # 카테고리별 통계
+            from sqlalchemy import distinct
+            category_stats = db.query(
+                CrawlNotice.category,
+                func.count(CrawlNotice.id).label('count')
+            ).filter(
+                and_(
+                    CrawlNotice.created_at >= yesterday_start,
+                    CrawlNotice.created_at <= yesterday_end
+                )
+            ).group_by(CrawlNotice.category).all()
+
+            # 전체 문서 수
+            total_in_db = db.query(func.count(CrawlNotice.id)).scalar() or 0
+
+        # Slack 메시지 생성
+        slack_enabled = os.getenv("ENABLE_SLACK_NOTIFICATIONS", "false").lower() == "true"
+        if slack_enabled:
+            # 카테고리별 통계 포맷팅
+            category_details = ""
+            if category_stats:
+                for category, count in category_stats:
+                    category_details += f"  - {category or '미분류'}: {count}개\n"
+            else:
+                category_details = "  - 수집된 문서 없음\n"
+
+            message = (
+                f"📊 *일일 크롤링 리포트*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📅 날짜: {yesterday.strftime('%Y년 %m월 %d일')}\n\n"
+                f"✨ *어제 수집 현황*\n"
+                f"• 신규 문서: *{total_docs}개*\n\n"
+                f"📂 *카테고리별 수집 현황*\n"
+                f"{category_details}\n"
+                f"💾 *전체 데이터베이스*\n"
+                f"• 총 문서 수: {total_in_db:,}개\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🕐 리포트 생성 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+
+            send_slack_alert(message)
+            logger.info(f"Daily report sent successfully: {total_docs} docs collected yesterday")
+
+        return {
+            "status": "success",
+            "total_docs_yesterday": total_docs,
+            "total_docs_in_db": total_in_db,
+            "category_stats": dict(category_stats) if category_stats else {}
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to generate daily report: {e}")
+
+        # 에러 발생 시에도 Slack 알림
+        slack_enabled = os.getenv("ENABLE_SLACK_NOTIFICATIONS", "false").lower() == "true"
+        if slack_enabled:
+            error_message = (
+                f"❌ *일일 리포트 생성 실패*\n\n"
+                f"• 에러: `{str(e)}`\n"
+                f"• 발생 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            try:
+                send_slack_alert(error_message)
+            except:
+                pass
+
+        return {"status": "failed", "error": str(e)}
+
+
 # Beat 스케줄러 등록
 celery_app.conf.beat_schedule = {
     "refresh-job-1": {
@@ -519,6 +671,11 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/15"),  # 15분마다
         "args": (1, "https://example.com/sitemap.xml", "P1", "AUTO"),
         "options": {"priority": PRIORITY_MAP["P1"]},
+    },
+    # 일일 요약 리포트 (매일 오전 9시)
+    "daily-report": {
+        "task": "tasks.send_daily_report",
+        "schedule": crontab(hour=9, minute=0),  # 매일 오전 9시
     },
     # 추가 잡/스케줄 등록 가능
 }

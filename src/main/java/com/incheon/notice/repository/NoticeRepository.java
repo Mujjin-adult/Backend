@@ -40,6 +40,28 @@ public interface NoticeRepository extends JpaRepository<Notice, Long> {
     Page<Notice> findAllByOrderByPublishedAtDesc(Pageable pageable);
 
     /**
+     * 전체 공지사항 페이징 조회 (조회수순)
+     */
+    Page<Notice> findAllByOrderByViewCountDesc(Pageable pageable);
+
+    /**
+     * 카테고리별 공지사항 페이징 조회 (조회수순)
+     */
+    Page<Notice> findByCategoryOrderByViewCountDesc(Category category, Pageable pageable);
+
+    /**
+     * 여러 카테고리의 공지사항 조회 (최신순)
+     */
+    @Query("SELECT n FROM Notice n WHERE n.category IN :categories ORDER BY n.publishedAt DESC")
+    Page<Notice> findByCategoryInOrderByPublishedAtDesc(@Param("categories") List<Category> categories, Pageable pageable);
+
+    /**
+     * 여러 카테고리의 공지사항 조회 (조회수순)
+     */
+    @Query("SELECT n FROM Notice n WHERE n.category IN :categories ORDER BY n.viewCount DESC")
+    Page<Notice> findByCategoryInOrderByViewCountDesc(@Param("categories") List<Category> categories, Pageable pageable);
+
+    /**
      * 제목이나 내용에 키워드가 포함된 공지사항 검색
      */
     @Query("SELECT n FROM Notice n WHERE n.title LIKE CONCAT('%', :keyword, '%') OR n.content LIKE CONCAT('%', :keyword, '%') ORDER BY n.publishedAt DESC")
