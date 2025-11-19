@@ -26,10 +26,31 @@ public class AuthController {
     private final com.incheon.notice.service.PasswordResetService passwordResetService;
 
     /**
-     * 회원가입
+     * 회원가입 (레거시 - Firebase SDK 사용 권장)
      * POST /api/auth/signup
+     *
+     * ⚠️ 주의: Firebase Authentication 사용을 권장합니다.
+     * 클라이언트에서 Firebase SDK의 createUserWithEmailAndPassword()를 사용하고,
+     * 발급받은 ID Token으로 /api/auth/login을 호출하면 자동으로 회원가입됩니다.
+     *
+     * 이 엔드포인트는 하위 호환성을 위해 유지되며, Firebase를 사용하지 않는 경우에만 사용하세요.
      */
-    @Operation(summary = "회원가입", description = "인천대학교 이메일로 회원가입을 진행합니다. 가입 후 이메일 인증이 필요합니다.")
+    @Operation(
+        summary = "회원가입 (레거시)",
+        description = """
+            ⚠️ **Firebase SDK 사용을 권장합니다**
+
+            **권장 방법 (Firebase):**
+            1. 클라이언트에서 Firebase SDK로 회원가입: `createUserWithEmailAndPassword(email, password)`
+            2. Firebase ID Token 발급받기: `user.getIdToken()`
+            3. `/api/auth/login`에 ID Token 전송
+            4. 서버에서 자동으로 사용자 생성
+
+            **레거시 방법 (이 API):**
+            인천대학교 이메일로 직접 회원가입을 진행합니다. 가입 후 이메일 인증이 필요합니다.
+            Firebase를 사용하지 않는 특수한 경우에만 사용하세요.
+            """
+    )
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<AuthDto.UserResponse>> signUp(
             @Valid @RequestBody AuthDto.SignUpRequest request) {
@@ -40,10 +61,33 @@ public class AuthController {
 
 
     /**
-     * 로그인
+     * 로그인 (Firebase Authentication)
      * POST /api/auth/login
+     *
+     * Firebase SDK로 로그인 후 발급받은 ID Token을 전송하여 인증합니다.
+     * 서버에 사용자 정보가 없는 경우 자동으로 회원가입됩니다.
      */
-    @Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인하여 JWT 토큰을 발급받습니다.")
+    @Operation(
+        summary = "로그인 (Firebase Authentication)",
+        description = """
+            Firebase ID Token을 사용하여 로그인합니다.
+
+            **사용 방법:**
+            1. 클라이언트에서 Firebase SDK로 로그인
+               - 이메일/비밀번호: `signInWithEmailAndPassword(email, password)`
+               - Google: `signInWithPopup(googleProvider)`
+               - 기타 소셜 로그인
+            2. Firebase ID Token 발급: `user.getIdToken()`
+            3. 이 API에 ID Token 전송
+            4. 서버에서 토큰 검증 및 사용자 정보 동기화
+
+            **자동 회원가입:**
+            Firebase로 로그인한 사용자가 서버 DB에 없는 경우, 자동으로 사용자가 생성됩니다.
+
+            **토큰 갱신:**
+            Firebase SDK가 자동으로 처리합니다. `user.getIdToken(true)`를 호출하세요.
+            """
+    )
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> login(
             @Valid @RequestBody AuthDto.LoginRequest request) {
@@ -52,38 +96,44 @@ public class AuthController {
     }
 
     /**
-     * 액세스 토큰 갱신
-     * POST /api/auth/refresh
-     */
-    @Operation(summary = "토큰 갱신", description = "리프레시 토큰으로 새로운 액세스 토큰을 발급받습니다.")
-    @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<String>> refreshToken(
-            @Valid @RequestBody AuthDto.RefreshTokenRequest request) {
-        String newAccessToken = authService.refreshAccessToken(request.getRefreshToken());
-        return ResponseEntity.ok(ApiResponse.success("토큰 갱신 성공", newAccessToken));
-    }
-
-    /**
      * 로그아웃
      * POST /api/auth/logout
      *
-     * Note: JWT는 stateless이므로 서버에서 토큰을 무효화할 수 없습니다.
-     * 클라이언트에서 토큰을 삭제하면 됩니다.
-     * 추후 Redis를 이용한 JWT 블랙리스트 기능을 추가할 예정입니다.
+     * Note: Firebase Authentication 사용 시 클라이언트에서 Firebase SDK의 signOut()을 호출하면 됩니다.
+     * 서버에서는 별도 처리가 필요 없습니다.
      */
-    @Operation(summary = "로그아웃", description = "로그아웃 처리를 합니다. 클라이언트에서 토큰을 삭제해야 합니다.")
+    @Operation(summary = "로그아웃", description = "로그아웃 처리를 합니다. Firebase SDK에서 auth().signOut()을 호출하세요.")
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout() {
-        // TODO: JWT 블랙리스트 구현 (Phase 6.1)
-        // 현재는 클라이언트에서 토큰을 삭제하도록 안내만 제공
-        return ResponseEntity.ok(ApiResponse.success("로그아웃되었습니다", null));
+        // Firebase Authentication 사용 시 클라이언트에서 처리
+        return ResponseEntity.ok(ApiResponse.success("로그아웃되었습니다. 클라이언트에서 Firebase signOut()을 호출하세요.", null));
     }
 
     /**
-     * 이메일 인증
+     * 이메일 인증 (레거시 - Firebase SDK 사용 권장)
      * GET /api/auth/verify-email?token={token}
+     *
+     * ⚠️ 주의: Firebase를 사용하는 경우, Firebase SDK의 이메일 인증 기능을 사용하세요.
+     * 클라이언트에서 user.sendEmailVerification()을 호출하면 Firebase가 자동으로 인증 메일을 발송합니다.
+     *
+     * 이 엔드포인트는 레거시 회원가입(/api/auth/signup)을 사용한 경우에만 필요합니다.
      */
-    @Operation(summary = "이메일 인증", description = "회원가입 시 발송된 이메일의 인증 링크로 이메일을 인증합니다.")
+    @Operation(
+        summary = "이메일 인증 (레거시)",
+        description = """
+            ⚠️ **Firebase SDK 사용을 권장합니다**
+
+            **권장 방법 (Firebase):**
+            ```javascript
+            // 회원가입 후
+            await user.sendEmailVerification();
+            // 사용자가 이메일 링크를 클릭하면 Firebase가 자동으로 인증 처리
+            ```
+
+            **레거시 방법 (이 API):**
+            레거시 회원가입 API(/api/auth/signup)를 사용한 경우, 발송된 이메일의 인증 링크로 이메일을 인증합니다.
+            """
+    )
     @GetMapping("/verify-email")
     public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
         emailVerificationService.verifyEmail(token);
@@ -91,10 +141,28 @@ public class AuthController {
     }
 
     /**
-     * 인증 메일 재발송
+     * 인증 메일 재발송 (레거시 - Firebase SDK 사용 권장)
      * POST /api/auth/resend-verification
+     *
+     * ⚠️ 주의: Firebase를 사용하는 경우, Firebase SDK의 이메일 인증 기능을 사용하세요.
+     *
+     * 이 엔드포인트는 레거시 회원가입(/api/auth/signup)을 사용한 경우에만 필요합니다.
      */
-    @Operation(summary = "인증 메일 재발송", description = "이메일 인증 메일을 다시 발송합니다.")
+    @Operation(
+        summary = "인증 메일 재발송 (레거시)",
+        description = """
+            ⚠️ **Firebase SDK 사용을 권장합니다**
+
+            **권장 방법 (Firebase):**
+            ```javascript
+            const user = auth().currentUser;
+            await user.sendEmailVerification();
+            ```
+
+            **레거시 방법 (이 API):**
+            레거시 회원가입을 사용한 경우, 이메일 인증 메일을 다시 발송합니다.
+            """
+    )
     @PostMapping("/resend-verification")
     public ResponseEntity<ApiResponse<Void>> resendVerificationEmail(@RequestParam String email) {
         emailVerificationService.resendVerificationEmail(email);
@@ -114,10 +182,35 @@ public class AuthController {
     }
 
     /**
-     * 비밀번호 찾기 (재설정 메일 발송)
+     * 비밀번호 찾기 (레거시 - Firebase SDK 사용 권장)
      * POST /api/auth/forgot-password
+     *
+     * ⚠️ 주의: Firebase를 사용하는 경우, Firebase SDK의 비밀번호 재설정 기능을 사용하세요.
+     * 클라이언트에서 auth.sendPasswordResetEmail(email)을 호출하면 Firebase가 자동으로 재설정 메일을 발송합니다.
+     *
+     * 이 엔드포인트는 레거시 회원가입(/api/auth/signup)을 사용한 경우에만 필요합니다.
      */
-    @Operation(summary = "비밀번호 찾기", description = "비밀번호 재설정 링크를 이메일로 발송합니다.")
+    @Operation(
+        summary = "비밀번호 찾기 (레거시)",
+        description = """
+            ⚠️ **Firebase SDK 사용을 권장합니다**
+
+            **권장 방법 (Firebase):**
+            ```javascript
+            // React Native
+            await auth().sendPasswordResetEmail(email);
+
+            // React Web
+            import { sendPasswordResetEmail } from 'firebase/auth';
+            await sendPasswordResetEmail(auth, email);
+            ```
+
+            Firebase가 자동으로 비밀번호 재설정 이메일을 발송하고 처리합니다.
+
+            **레거시 방법 (이 API):**
+            레거시 회원가입을 사용한 경우, 비밀번호 재설정 링크를 이메일로 발송합니다.
+            """
+    )
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
             @Valid @RequestBody AuthDto.ForgotPasswordRequest request) {
@@ -126,10 +219,27 @@ public class AuthController {
     }
 
     /**
-     * 비밀번호 재설정
+     * 비밀번호 재설정 (레거시 - Firebase SDK 사용 권장)
      * POST /api/auth/reset-password
+     *
+     * ⚠️ 주의: Firebase를 사용하는 경우, Firebase SDK가 자동으로 처리합니다.
+     *
+     * 이 엔드포인트는 레거시 회원가입(/api/auth/signup)을 사용한 경우에만 필요합니다.
      */
-    @Operation(summary = "비밀번호 재설정", description = "이메일로 받은 토큰으로 새로운 비밀번호를 설정합니다.")
+    @Operation(
+        summary = "비밀번호 재설정 (레거시)",
+        description = """
+            ⚠️ **Firebase SDK 사용을 권장합니다**
+
+            **권장 방법 (Firebase):**
+            Firebase가 이메일로 전송한 비밀번호 재설정 링크를 클릭하면,
+            Firebase 호스팅 페이지에서 새 비밀번호를 입력하고 자동으로 재설정됩니다.
+            서버 API 호출 없이 Firebase가 모든 것을 처리합니다.
+
+            **레거시 방법 (이 API):**
+            레거시 회원가입을 사용한 경우, 이메일로 받은 토큰으로 새로운 비밀번호를 설정합니다.
+            """
+    )
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @Valid @RequestBody AuthDto.ResetPasswordRequest request) {
