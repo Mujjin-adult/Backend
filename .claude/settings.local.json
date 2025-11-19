@@ -36,7 +36,12 @@
       "Bash(else echo \".env file not found\")",
       "Bash(fi)",
       "Bash(tree:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(gradle clean build:*)",
+      "Bash(java -version:*)",
+      "Bash(lsof:*)",
+      "Bash(pip3 list:*)",
+      "Bash(pip3 install:*)"
     ],
     "deny": [],
     "ask": []
