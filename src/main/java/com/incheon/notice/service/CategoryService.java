@@ -3,7 +3,7 @@ package com.incheon.notice.service;
 import com.incheon.notice.dto.CategoryDto;
 import com.incheon.notice.entity.Category;
 import com.incheon.notice.repository.CategoryRepository;
-import com.incheon.notice.repository.NoticeRepository;
+import com.incheon.notice.repository.CrawlNoticeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
-    private final NoticeRepository noticeRepository;
+    private final CrawlNoticeRepository crawlNoticeRepository;
 
     /**
      * 전체 카테고리 목록 조회
@@ -78,8 +78,8 @@ public class CategoryService {
      * Entity -> DTO 변환
      */
     private CategoryDto.Response toDto(Category category) {
-        // 해당 카테고리의 공지사항 개수 조회
-        long noticeCount = noticeRepository.countByCategoryCode(category.getCode());
+        // 해당 카테고리의 공지사항 개수 조회 (crawl_notice 테이블에서)
+        long noticeCount = crawlNoticeRepository.countByCategoryId(category.getId());
 
         return CategoryDto.Response.builder()
                 .id(category.getId())

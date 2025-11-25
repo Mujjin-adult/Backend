@@ -1,5 +1,7 @@
 package com.incheon.notice.service;
 
+import com.google.firebase.auth.ActionCodeSettings;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import com.incheon.notice.dto.AuthDto;
@@ -11,6 +13,7 @@ import com.incheon.notice.repository.UserRepository;
 import com.incheon.notice.security.FirebaseTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,8 +30,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final FirebaseTokenProvider firebaseTokenProvider;
-    private final EmailVerificationService emailVerificationService;
     private final EmailService emailService;
+
+    @Value("${app.frontend.url:http://localhost:3000}")
+    private String frontendUrl;
 
     /**
      * 회원가입 (레거시)
@@ -72,14 +77,9 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // 이메일 인증 토큰 생성 및 메일 발송
-        try {
-            emailVerificationService.createAndSendVerificationToken(savedUser);
-        } catch (Exception e) {
-            // 이메일 발송 실패 시 로그만 남기고 회원가입은 성공 처리
-            // 사용자가 나중에 인증 메일을 재요청할 수 있음
-            log.error("이메일 인증 메일 발송 실패: email={}, error={}", savedUser.getEmail(), e.getMessage());
-        }
+        // Note: 이메일 인증은 Firebase Authentication에서 처리합니다.
+        // 레거시 회원가입 메서드이므로 이메일 인증 없이 계정 생성만 수행합니다.
+        log.info("레거시 회원가입 완료: email={}", savedUser.getEmail());
 
         return AuthDto.UserResponse.builder()
                 .id(savedUser.getId())
@@ -117,20 +117,34 @@ public class AuthService {
             String email = firebaseToken.getEmail();
             String firebaseUid = firebaseToken.getUid();
 
-            // 자체 DB에서 사용자 조회 (없으면 자동 회원가입)
-            User user = userRepository.findByEmail(email)
+            // 1. Firebase UID로 사용자 조회 (우선순위 1)
+            User user = userRepository.findByFirebaseUid(firebaseUid)
                     .orElseGet(() -> {
-                        // Firebase로 로그인했지만 자체 DB에 없는 경우 자동 생성
-                        User newUser = User.builder()
-                                .email(email)
-                                .name(firebaseToken.getName() != null ? firebaseToken.getName() : "사용자")
-                                .studentId(firebaseUid) // Firebase UID를 학번 대신 사용 (임시)
-                                .password(passwordEncoder.encode(firebaseUid)) // 임시 비밀번호
-                                .role(UserRole.USER)
-                                .isActive(true)
-                                .isEmailVerified(firebaseToken.isEmailVerified())
-                                .build();
-                        return userRepository.save(newUser);
+                        // 2. 이메일로 사용자 조회 (기존 사용자 지원)
+                        return userRepository.findByEmail(email)
+                                .map(existingUser -> {
+                                    // 기존 사용자에게 Firebase UID 설정
+                                    if (existingUser.getFirebaseUid() == null) {
+                                        existingUser.updateFirebaseUid(firebaseUid);
+                                        log.info("기존 사용자에게 Firebase UID 연결: email={}, uid={}", email, firebaseUid);
+                                    }
+                                    return existingUser;
+                                })
+                                .orElseGet(() -> {
+                                    // 3. 완전히 새로운 사용자 - 자동 회원가입
+                                    User newUser = User.builder()
+                                            .firebaseUid(firebaseUid)
+                                            .email(email)
+                                            .name(firebaseToken.getName() != null ? firebaseToken.getName() : "사용자")
+                                            .studentId(null) // 학번은 나중에 클라이언트에서 입력
+                                            .password(passwordEncoder.encode(firebaseUid)) // 임시 비밀번호
+                                            .role(UserRole.USER)
+                                            .isActive(true)
+                                            .isEmailVerified(firebaseToken.isEmailVerified())
+                                            .build();
+                                    log.info("Firebase 자동 회원가입: email={}, uid={}", email, firebaseUid);
+                                    return userRepository.save(newUser);
+                                });
                     });
 
             // FCM 토큰 업데이트 (있는 경우)
@@ -208,5 +222,73 @@ public class AuthService {
         }
 
         return masked + "@" + domain;
+    }
+
+    /**
+     * 이메일 인증 링크 생성 및 발송 (Firebase)
+     *
+     * 서버에서 Firebase Admin SDK를 사용하여 이메일 인증 링크를 생성하고 발송합니다.
+     *
+     * ⚠️ 권장: 클라이언트에서 Firebase SDK의 sendEmailVerification()을 사용하는 것이 더 간단합니다.
+     *
+     * 이 메서드는 다음과 같은 경우에 사용하세요:
+     * - 커스텀 이메일 템플릿이 필요한 경우
+     * - 서버에서 이메일 발송을 완전히 제어해야 하는 경우
+     *
+     * @param email 이메일 주소
+     * @return 성공 메시지
+     * @throws BusinessException 이메일 발송 실패 시
+     */
+    @Transactional(readOnly = true)
+    public String sendEmailVerification(String email) {
+        try {
+            // 1. Firebase에서 사용자 조회
+            var firebaseUser = FirebaseAuth.getInstance().getUserByEmail(email);
+
+            // 2. 이미 인증된 경우
+            if (firebaseUser.isEmailVerified()) {
+                log.info("이미 인증된 이메일: email={}", email);
+                return "이미 인증된 이메일입니다";
+            }
+
+            // 3. ActionCodeSettings 생성 (인증 후 리다이렉트 URL 설정)
+            ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
+                    .setUrl(frontendUrl + "/email-verified") // 인증 완료 후 이동할 URL
+                    .setHandleCodeInApp(false) // 이메일 링크를 앱에서 처리하지 않음
+                    .build();
+
+            // 4. 이메일 인증 링크 생성
+            String verificationLink = FirebaseAuth.getInstance()
+                    .generateEmailVerificationLink(email, actionCodeSettings);
+
+            // 5. 이메일 발송 (EmailService 사용)
+            emailService.sendFirebaseVerificationEmail(email, verificationLink);
+
+            log.info("이메일 인증 링크 발송 완료: email={}", email);
+            return "이메일 인증 링크가 발송되었습니다";
+
+        } catch (FirebaseAuthException e) {
+            log.error("이메일 인증 링크 생성 실패: email={}, error={}", email, e.getMessage());
+            throw new BusinessException("이메일 인증 링크 생성에 실패했습니다: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("이메일 발송 실패: email={}, error={}", email, e.getMessage());
+            throw new BusinessException("이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        }
+    }
+
+    /**
+     * 이메일 인증 메일 재발송 (Firebase)
+     *
+     * @param email 이메일 주소
+     * @return 성공 메시지
+     * @throws BusinessException 이메일 발송 실패 시
+     */
+    @Transactional(readOnly = true)
+    public String resendEmailVerification(String email) {
+        // 사용자가 DB에 존재하는지 확인
+        userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("등록되지 않은 이메일입니다"));
+
+        return sendEmailVerification(email);
     }
 }
