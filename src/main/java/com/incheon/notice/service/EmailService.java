@@ -87,6 +87,28 @@ public class EmailService {
     }
 
     /**
+     * Firebase 이메일 인증 메일 발송
+     */
+    public void sendFirebaseVerificationEmail(String toEmail, String verificationLink) {
+        log.debug("Firebase 이메일 인증 메일 발송: toEmail={}", toEmail);
+
+        String subject = "[인천대 공지사항] 이메일 인증";
+
+        String content = String.format(
+                "인천대학교 공지사항 앱 회원가입을 환영합니다!\n\n" +
+                "아래 링크를 클릭하여 이메일 인증을 완료해주세요.\n\n" +
+                "%s\n\n" +
+                "이메일 인증을 완료하면 모든 기능을 이용하실 수 있습니다.\n\n" +
+                "본인이 요청하지 않은 경우 이 이메일을 무시해주세요.\n\n" +
+                "감사합니다.\n" +
+                "인천대학교 공지사항 앱 팀",
+                verificationLink
+        );
+
+        sendEmail(toEmail, subject, content);
+    }
+
+    /**
      * 일반 이메일 발송
      */
     private void sendEmail(String to, String subject, String content) {

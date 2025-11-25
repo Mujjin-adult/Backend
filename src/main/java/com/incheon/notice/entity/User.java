@@ -13,7 +13,8 @@ import java.util.List;
 @Entity
 @Table(name = "users", indexes = {
     @Index(name = "idx_email", columnList = "email"),
-    @Index(name = "idx_student_id", columnList = "student_id")
+    @Index(name = "idx_student_id", columnList = "student_id"),
+    @Index(name = "idx_firebase_uid", columnList = "firebase_uid")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -25,8 +26,11 @@ public class User extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 20)
-    private String studentId;  // 학번
+    @Column(unique = true, length = 20)
+    private String studentId;  // 학번 (nullable - 나중에 입력 가능)
+
+    @Column(unique = true, length = 50)
+    private String firebaseUid;  // Firebase Authentication UID (nullable - 레거시 회원가입 시 null)
 
     @Column(nullable = false, unique = true, length = 100)
     private String email;  // 이메일
@@ -131,6 +135,20 @@ public class User extends BaseEntity {
      */
     public void verifyEmail() {
         this.isEmailVerified = true;
+    }
+
+    /**
+     * 학번 설정 (Firebase 로그인 후 학번 입력 시)
+     */
+    public void updateStudentId(String studentId) {
+        this.studentId = studentId;
+    }
+
+    /**
+     * Firebase UID 설정
+     */
+    public void updateFirebaseUid(String firebaseUid) {
+        this.firebaseUid = firebaseUid;
     }
 }
 
