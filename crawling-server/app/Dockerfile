@@ -6,7 +6,7 @@ LABEL description="College Notice Crawler - Production Ready"
 LABEL version="2.0"
 
 # 비루트 사용자 생성 (보안 강화)
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN groupadd -r appuser && useradd -r -g appuser -m appuser
 
 # 시스템 의존성 설치 (Playwright용)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcups2 \
     libdbus-1-3 \
     libdrm2 \
+    libgbm1 \
     libgtk-3-0 \
     libnspr4 \
     libnss3 \
@@ -37,6 +38,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxfixes3 \
     libxi6 \
     libxrender1 \
+    libglib2.0-0 \
+    libpango-1.0-0 \
+    libcairo2 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -47,9 +51,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir debugpy \
     && rm -rf ~/.cache/pip
-
-# Playwright 브라우저 설치
-RUN playwright install chromium --with-deps
 
 # 애플리케이션 코드 복사
 COPY --chown=appuser:appuser . /app
@@ -65,6 +66,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # 비루트 사용자로 전환
 USER appuser
+
+# Playwright 브라우저 설치 (appuser로 설치하여 권한 문제 해결)
+RUN playwright install chromium
 
 # 포트 노출
 EXPOSE 8000

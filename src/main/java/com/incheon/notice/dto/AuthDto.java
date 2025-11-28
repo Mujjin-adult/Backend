@@ -38,6 +38,25 @@ public class AuthDto {
     }
 
     /**
+     * 이메일/비밀번호 로그인 요청 DTO (서버 로그인)
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EmailLoginRequest {
+
+        @NotBlank(message = "이메일은 필수입니다")
+        @Email(message = "올바른 이메일 형식이 아닙니다")
+        private String email;
+
+        @NotBlank(message = "비밀번호는 필수입니다")
+        private String password;
+
+        private String fcmToken;  // 선택적: FCM 토큰
+    }
+
+    /**
      * 로그인 요청 DTO (Firebase Authentication 사용)
      */
     @Getter

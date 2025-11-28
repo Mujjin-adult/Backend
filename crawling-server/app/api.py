@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 from pydantic import BaseModel
+import logging
 
 from database import get_db
 from crud import (
@@ -20,6 +21,9 @@ from crud import (
     get_job_statistics,
     get_host_statistics,
 )
+import schemas
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/v1",
@@ -247,7 +251,7 @@ def search_docs(
                 created_at
             FROM crawl_notice
             WHERE {' AND '.join(base_conditions)}
-            ORDER BY created_at DESC
+            ORDER BY date DESC NULLS LAST, created_at DESC
             LIMIT :limit
         """)
 
@@ -528,7 +532,7 @@ def get_recent_documents(
                 category as category,
                 created_at
             FROM crawl_notice
-            ORDER BY created_at DESC
+            ORDER BY date DESC NULLS LAST, created_at DESC
             LIMIT :limit
         """),
             {"limit": limit},
@@ -585,7 +589,7 @@ def search_by_title(
                 created_at
             FROM crawl_notice
             WHERE title ILIKE :query
-            ORDER BY created_at DESC
+            ORDER BY date DESC NULLS LAST, created_at DESC
             LIMIT :limit
         """),
             {"query": search_query, "limit": limit},
@@ -645,7 +649,7 @@ def search_by_content(
                 created_at
             FROM crawl_notice
             WHERE raw ILIKE :query
-            ORDER BY created_at DESC
+            ORDER BY date DESC NULLS LAST, created_at DESC
             LIMIT :limit
         """),
             {"query": search_query, "limit": limit},
@@ -738,4 +742,159 @@ def get_crawling_status(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to get crawling status: {str(e)}"
+        )
+
+
+# ==================== Content Crawling API ====================
+
+
+@router.post(
+    "/crawl-content/batch",
+    response_model=schemas.ContentCrawlResult,
+    summary="공지사항 본문 일괄 크롤링",
+    description="""
+    content 필드가 비어있는 공지사항의 본문을 일괄 크롤링합니다.
+
+    **작동 방식:**
+    1. content가 NULL이거나 빈 문자열인 공지사항 조회
+    2. 각 공지사항의 URL에 접속하여 본문 크롤링
+    3. BeautifulSoup으로 정적 HTML 크롤링 시도
+    4. 실패 시 최대 3회 재시도
+    5. DB에 content 필드 업데이트
+
+    **성능 고려:**
+    - 레이트 리미팅 적용 (호스트당 1초 딜레이)
+    - 배치 크기 제한 (최대 500개)
+    - 비동기 처리 권장 (대량 크롤링 시)
+
+    **사용 예시:**
+    ```bash
+    curl -X POST "http://localhost:8001/api/v1/crawl-content/batch" \\
+      -H "Content-Type: application/json" \\
+      -d '{"limit": 100, "source": "volunteer"}'
+    ```
+    """,
+    tags=["Content Crawling"]
+)
+async def crawl_content_batch(
+    request: schemas.ContentCrawlRequest = None,
+    db: Session = Depends(get_db)
+):
+    """
+    content 필드가 비어있는 공지사항의 본문을 일괄 크롤링
+
+    Args:
+        request: 크롤링 요청 파라미터 (limit, source)
+        db: 데이터베이스 세션
+
+    Returns:
+        ContentCrawlResult: 크롤링 결과 (성공/실패 통계, 에러 목록)
+    """
+    import time
+    from app.content_crawler import get_content_crawler
+    from app.crud import get_notices_without_content, update_notice_content
+
+    start_time = time.time()
+
+    # 요청 파라미터 기본값 설정
+    if request is None:
+        request = schemas.ContentCrawlRequest(limit=100)
+
+    limit = request.limit
+    source = request.source.value if request.source else None
+
+    logger.info(f"Starting batch content crawling: limit={limit}, source={source}")
+
+    try:
+        # content가 비어있는 공지사항 조회
+        notices = get_notices_without_content(db, limit=limit, source=source)
+        total_attempted = len(notices)
+
+        if total_attempted == 0:
+            logger.info("No notices found without content")
+            return schemas.ContentCrawlResult(
+                total_attempted=0,
+                success_count=0,
+                failed_count=0,
+                failed_notices=[],
+                execution_time_seconds=time.time() - start_time
+            )
+
+        logger.info(f"Found {total_attempted} notices without content")
+
+        # 크롤러 인스턴스 가져오기
+        crawler = get_content_crawler()
+
+        # 크롤링 결과 저장
+        success_count = 0
+        failed_count = 0
+        failed_notices = []
+
+        # 각 공지사항 크롤링
+        for i, notice in enumerate(notices, 1):
+            logger.info(f"Crawling {i}/{total_attempted}: {notice.url}")
+
+            # 본문 크롤링
+            result = crawler.crawl_content(
+                url=notice.url,
+                category=notice.source
+            )
+
+            if result["success"]:
+                # DB 업데이트
+                updated_notice = update_notice_content(
+                    db=db,
+                    notice_id=notice.id,
+                    content=result["content"]
+                )
+
+                if updated_notice:
+                    success_count += 1
+                    logger.info(f"Successfully crawled and updated notice {notice.id}")
+                else:
+                    failed_count += 1
+                    failed_notices.append(
+                        schemas.ContentCrawlErrorDetail(
+                            notice_id=notice.id,
+                            url=notice.url,
+                            error="Failed to update database"
+                        )
+                    )
+            else:
+                # 크롤링 실패
+                failed_count += 1
+                failed_notices.append(
+                    schemas.ContentCrawlErrorDetail(
+                        notice_id=notice.id,
+                        url=notice.url,
+                        error=result.get("error", "Unknown error")
+                    )
+                )
+                logger.warning(f"Failed to crawl notice {notice.id}: {result.get('error')}")
+
+            # 레이트 리미팅 (호스트당 1-2초 딜레이)
+            if i < total_attempted:
+                time.sleep(1.5)
+
+        execution_time = time.time() - start_time
+
+        logger.info(
+            f"Batch content crawling completed: "
+            f"total={total_attempted}, success={success_count}, "
+            f"failed={failed_count}, time={execution_time:.2f}s"
+        )
+
+        return schemas.ContentCrawlResult(
+            total_attempted=total_attempted,
+            success_count=success_count,
+            failed_count=failed_count,
+            failed_notices=failed_notices,
+            execution_time_seconds=round(execution_time, 2)
+        )
+
+    except Exception as e:
+        logger.error(f"Error during batch content crawling: {type(e).__name__}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Batch content crawling failed: {str(e)}"
         )

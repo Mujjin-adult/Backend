@@ -31,11 +31,6 @@ dependencies {
     // Database
     runtimeOnly 'org.postgresql:postgresql'
 
-    // JWT (JSON Web Token) for authentication
-    implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
-
     // HTTP Client (FastAPI 크롤링 서버와 통신)
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
