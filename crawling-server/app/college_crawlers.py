@@ -12,6 +12,7 @@ import random
 
 from app.circuit_breaker import get_circuit_breaker, CircuitBreakerError
 from app.sentry_config import track_crawler_error
+from app.content_crawler import get_content_crawler
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +38,11 @@ def clean_category(category_text: str) -> str:
     return category_text.replace('[', '').replace(']', '')
 class CollegeCrawler:
     """대학 공지사항 통합 크롤러"""
-    def __init__(self, max_pages: int = 5, max_retries: int = 3):
+    def __init__(self, max_pages: int = 5, max_retries: int = 3, crawl_content: bool = True):
         self.base_url = "https://www.inu.ac.kr"
         self.max_pages = max_pages  # 최대 크롤링 페이지 수
         self.max_retries = max_retries  # 최대 재시도 횟수
+        self.crawl_content = crawl_content  # 본문 크롤링 여부
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -56,6 +58,10 @@ class CollegeCrawler:
             timeout=60.0,
             expected_exception=TemporaryError
         )
+
+        # Content Crawler 초기화 (본문 크롤링용)
+        if self.crawl_content:
+            self.content_crawler = get_content_crawler()
 
     def _make_request_with_retry(self, url: str, payload: dict, retry_count: int = 0) -> requests.Response:
         """
@@ -211,7 +217,9 @@ class CollegeCrawler:
                 category_text = clean_category(category_text)
             else:
                 category_text = default_category or "N/A"
-            return {
+
+            # 기본 정보
+            item = {
                 "title": title,
                 "writer": writer_text,
                 "date": date_text,
@@ -220,6 +228,33 @@ class CollegeCrawler:
                 "category": category_text,
                 "source": source,
             }
+
+            # 본문 크롤링 (옵션)
+            if self.crawl_content and self.content_crawler:
+                try:
+                    logger.debug(f"Crawling content for: {full_url}")
+                    content_result = self.content_crawler.crawl_content(
+                        url=full_url,
+                        category=source
+                    )
+
+                    if content_result.get("success"):
+                        item["content"] = content_result.get("content", "")
+                        logger.debug(f"Successfully crawled content for: {full_url}")
+                    else:
+                        logger.warning(f"Failed to crawl content for {full_url}: {content_result.get('error')}")
+                        item["content"] = ""
+
+                    # 레이트 리미팅을 위한 짧은 딜레이
+                    time.sleep(0.3)
+
+                except Exception as content_error:
+                    logger.error(f"Error crawling content for {full_url}: {content_error}")
+                    item["content"] = ""
+            else:
+                item["content"] = ""
+
+            return item
         except Exception as e:
             logger.error(f"Error parsing row: {e}")
             return None

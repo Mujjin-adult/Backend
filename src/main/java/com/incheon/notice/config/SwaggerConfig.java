@@ -32,8 +32,8 @@ public class SwaggerConfig {
                                 new SecurityScheme()
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
-                                        .bearerFormat("JWT")
-                                        .description("JWT 토큰을 입력하세요")))
+                                        .bearerFormat("Firebase")
+                                        .description("Firebase 커스텀 토큰 또는 ID 토큰을 입력하세요")))
                 .tags(Arrays.asList(
                         new Tag().name("인증 및 회원관리").description("회원가입, 로그인, 아이디/비밀번호 찾기 API"),
                         new Tag().name("사용자 정보").description("사용자 프로필 조회 및 관리 API"),

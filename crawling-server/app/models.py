@@ -122,14 +122,6 @@ class CrawlNotice(Base):
 
     # 메인 서버 통합을 위한 추가 필드들
     content = Column(Text, nullable=True)  # 공지사항 본문 내용
-    external_id = Column(String(100), nullable=True, unique=True, index=True)  # 중복 방지용 외부 ID
-    category_id = Column(Integer, nullable=True, index=True)  # FK to categories.id (메인 서버와 연동)
-    author = Column(String(100), nullable=True)  # writer의 별칭 (메인 서버 호환)
-    published_at = Column(DateTime(timezone=True), nullable=True, index=True)  # 게시 날짜
-    view_count = Column(Integer, default=0)  # 조회수
-    is_important = Column(Boolean, default=False, index=True)  # 중요 공지 여부
-    is_pinned = Column(Boolean, default=False, index=True)  # 상단 고정 여부
-    attachments = Column(Text, nullable=True)  # 첨부파일 JSON 형식
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())  # 업데이트 시간
 
     # 원본 데이터 (deprecated - 하위 호환성 유지)

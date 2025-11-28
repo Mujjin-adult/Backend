@@ -119,6 +119,13 @@ public class CrawlNotice extends BaseEntity {
     }
 
     /**
+     * 조회수 증가 (1씩 증가)
+     */
+    public void incrementViewCount() {
+        this.viewCount = (this.viewCount == null ? 0 : this.viewCount) + 1;
+    }
+
+    /**
      * 공지사항 정보 업데이트 (크롤링 시 변경사항 반영)
      */
     public void updateInfo(String title, String content, String author, Integer viewCount) {

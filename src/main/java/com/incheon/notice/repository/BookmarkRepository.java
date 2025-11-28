@@ -42,4 +42,9 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
      * 사용자의 북마크 개수
      */
     long countByUserId(Long userId);
+
+    /**
+     * 사용자 이메일과 공지사항 ID로 북마크 존재 여부 확인
+     */
+    boolean existsByUser_EmailAndCrawlNotice_Id(String email, Long crawlNoticeId);
 }

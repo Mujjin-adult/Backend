@@ -4,6 +4,7 @@ import com.incheon.notice.entity.CrawlNotice;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,7 +17,7 @@ import java.util.Optional;
  * 크롤링 공지사항 Repository
  */
 @Repository
-public interface CrawlNoticeRepository extends JpaRepository<CrawlNotice, Long> {
+public interface CrawlNoticeRepository extends JpaRepository<CrawlNotice, Long>, JpaSpecificationExecutor<CrawlNotice> {
 
     /**
      * 외부 ID로 조회 (중복 체크용)

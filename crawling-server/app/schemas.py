@@ -297,3 +297,57 @@ def validate_crawler_trigger(data: Dict[str, Any]) -> CrawlerTriggerRequest:
         ValidationError: 검증 실패 시
     """
     return CrawlerTriggerRequest(**data)
+
+
+# ===================================================================
+# Content Crawling Schemas (본문 크롤링)
+# ===================================================================
+
+class ContentCrawlRequest(BaseModel):
+    """본문 크롤링 요청"""
+    limit: int = Field(100, description="크롤링할 최대 공지사항 수", ge=1, le=500)
+    source: Optional[CrawlSource] = Field(None, description="카테고리 필터")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "limit": 100,
+                "source": "volunteer"
+            }
+        }
+
+
+class ContentCrawlErrorDetail(BaseModel):
+    """본문 크롤링 에러 상세"""
+    notice_id: int = Field(..., description="공지사항 ID")
+    url: str = Field(..., description="크롤링 실패한 URL")
+    error: str = Field(..., description="에러 메시지")
+
+
+class ContentCrawlResult(BaseModel):
+    """본문 크롤링 결과"""
+    total_attempted: int = Field(..., description="크롤링 시도한 총 개수")
+    success_count: int = Field(..., description="성공한 개수")
+    failed_count: int = Field(..., description="실패한 개수")
+    failed_notices: List[ContentCrawlErrorDetail] = Field(
+        default_factory=list,
+        description="실패한 공지사항 목록"
+    )
+    execution_time_seconds: float = Field(..., description="실행 시간 (초)")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "total_attempted": 50,
+                "success_count": 45,
+                "failed_count": 5,
+                "failed_notices": [
+                    {
+                        "notice_id": 123,
+                        "url": "https://www.inu.ac.kr/bbs/inu/253/artclView.do?artclSeq=123",
+                        "error": "Request timeout"
+                    }
+                ],
+                "execution_time_seconds": 125.5
+            }
+        }

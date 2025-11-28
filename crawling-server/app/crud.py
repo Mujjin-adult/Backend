@@ -224,7 +224,7 @@ def get_documents(
     if category:
         query = query.filter(CrawlNotice.category == category)
 
-    return query.order_by(desc(CrawlNotice.created_at)).offset(skip).limit(limit).all()
+    return query.order_by(desc(CrawlNotice.date), desc(CrawlNotice.created_at)).offset(skip).limit(limit).all()
 
 
 def get_documents_by_job(
@@ -234,6 +234,7 @@ def get_documents_by_job(
     return (
         db.query(CrawlNotice)
         .filter(CrawlNotice.job_id == job_id)
+        .order_by(desc(CrawlNotice.date), desc(CrawlNotice.created_at))
         .offset(skip)
         .limit(limit)
         .all()
@@ -266,7 +267,7 @@ def search_documents(
             or_(CrawlNotice.url.contains(q), CrawlNotice.raw.contains(q))
         )
 
-    return query.offset(skip).limit(limit).all()
+    return query.order_by(desc(CrawlNotice.date), desc(CrawlNotice.created_at)).offset(skip).limit(limit).all()
 
 
 # ==================== HostBudget CRUD ====================
@@ -422,3 +423,101 @@ def get_host_statistics(db: Session) -> List[Dict[str, Any]]:
         }
         for stat in stats
     ]
+
+
+# ==================== Content Crawling Functions ====================
+
+
+def get_notices_without_content(
+    db: Session,
+    limit: int = 100,
+    source: Optional[str] = None
+) -> List[CrawlNotice]:
+    """
+    content 필드가 비어있는 공지사항 조회
+
+    Args:
+        db: 데이터베이스 세션
+        limit: 최대 조회 개수
+        source: 카테고리 필터 (volunteer, job, scholarship 등)
+
+    Returns:
+        content가 NULL이거나 빈 문자열인 CrawlNotice 리스트
+    """
+    query = db.query(CrawlNotice).filter(
+        or_(
+            CrawlNotice.content == None,
+            CrawlNotice.content == ""
+        )
+    )
+
+    if source:
+        query = query.filter(CrawlNotice.source == source)
+
+    return query.order_by(desc(CrawlNotice.created_at)).limit(limit).all()
+
+
+def update_notice_content(
+    db: Session,
+    notice_id: int,
+    content: str
+) -> Optional[CrawlNotice]:
+    """
+    공지사항의 content 필드 업데이트
+
+    Args:
+        db: 데이터베이스 세션
+        notice_id: 공지사항 ID
+        content: 업데이트할 본문 내용
+
+    Returns:
+        업데이트된 CrawlNotice 객체 (실패 시 None)
+    """
+    db_notice = get_document(db, notice_id)
+    if db_notice:
+        db_notice.content = content
+        db_notice.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(db_notice)
+    return db_notice
+
+
+def bulk_update_notice_contents(
+    db: Session,
+    updates: List[Dict[str, Any]]
+) -> int:
+    """
+    여러 공지사항의 content 필드를 일괄 업데이트
+
+    Args:
+        db: 데이터베이스 세션
+        updates: 업데이트 데이터 리스트
+                 [{id: int, content: str}, ...]
+
+    Returns:
+        업데이트된 레코드 수
+    """
+    if not updates:
+        return 0
+
+    try:
+        # 현재 시각
+        now = datetime.utcnow()
+
+        # 벌크 업데이트 준비
+        update_mappings = []
+        for update in updates:
+            update_mappings.append({
+                "id": update["id"],
+                "content": update["content"],
+                "updated_at": now
+            })
+
+        # SQLAlchemy bulk_update_mappings 사용
+        db.bulk_update_mappings(CrawlNotice, update_mappings)
+        db.commit()
+        return len(update_mappings)
+
+    except Exception as e:
+        db.rollback()
+        raise e

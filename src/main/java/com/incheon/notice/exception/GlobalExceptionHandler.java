@@ -72,6 +72,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 리소스를 찾을 수 없는 예외 처리 (공지사항 등)
+     * HTTP 404 Not Found
+     */
+    @ExceptionHandler(NoticeNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoticeNotFoundException(
+            NoticeNotFoundException ex) {
+        log.error("Notice not found: {}", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    /**
      * 비즈니스 로직 예외 처리
      * HTTP 400 Bad Request
      */

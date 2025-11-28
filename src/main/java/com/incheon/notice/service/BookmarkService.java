@@ -159,7 +159,7 @@ public class BookmarkService {
                         .viewCount(notice.getViewCount())
                         .isImportant(notice.getIsImportant())
                         .isPinned(notice.getIsPinned())
-                        .isBookmarked(true)
+                        .bookmarked(true)
                         .build())
                 .memo(bookmark.getMemo())
                 .createdAt(bookmark.getCreatedAt())

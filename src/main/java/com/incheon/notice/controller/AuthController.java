@@ -24,29 +24,55 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * 회원가입 (레거시 - Firebase SDK 사용 권장)
+     * 회원가입 (Firebase 통합)
      * POST /api/auth/signup
      *
-     * ⚠️ 주의: Firebase Authentication 사용을 권장합니다.
-     * 클라이언트에서 Firebase SDK의 createUserWithEmailAndPassword()를 사용하고,
-     * 발급받은 ID Token으로 /api/auth/login을 호출하면 자동으로 회원가입됩니다.
-     *
-     * 이 엔드포인트는 하위 호환성을 위해 유지되며, Firebase를 사용하지 않는 경우에만 사용하세요.
+     * 서버에서 Firebase Authentication에 사용자를 생성하고 DB에 저장합니다.
+     * 회원가입 후 반드시 클라이언트에서 로그인하여 idToken과 fcmToken을 등록해야 합니다.
      */
     @Operation(
-        summary = "회원가입 (레거시)",
+        summary = "회원가입 (Firebase 통합)",
         description = """
-            ⚠️ **Firebase SDK 사용을 권장합니다**
+            서버에서 Firebase Authentication에 사용자를 생성하고 DB에 저장합니다.
 
-            **권장 방법 (Firebase):**
-            1. 클라이언트에서 Firebase SDK로 회원가입: `createUserWithEmailAndPassword(email, password)`
-            2. Firebase ID Token 발급받기: `user.getIdToken()`
-            3. `/api/auth/login`에 ID Token 전송
-            4. 서버에서 자동으로 사용자 생성
+            **플로우:**
+            1. **회원가입 API 호출** (이 엔드포인트)
+               - 서버: Firebase에 사용자 생성 + DB 저장
+               - 서버: 이메일 인증 링크 발송
 
-            **레거시 방법 (이 API):**
-            인천대학교 이메일로 직접 회원가입을 진행합니다. 가입 후 이메일 인증이 필요합니다.
-            Firebase를 사용하지 않는 특수한 경우에만 사용하세요.
+            2. **클라이언트: Firebase 로그인**
+               ```javascript
+               // React Native 예시
+               import auth from '@react-native-firebase/auth';
+
+               const userCredential = await auth().signInWithEmailAndPassword(email, password);
+               const idToken = await userCredential.user.getIdToken();
+               ```
+
+            3. **클라이언트: FCM 토큰 발급**
+               ```javascript
+               import messaging from '@react-native-firebase/messaging';
+
+               const fcmToken = await messaging().getToken();
+               ```
+
+            4. **로그인 API 호출** (`POST /api/auth/login`)
+               ```json
+               {
+                 "idToken": "eyJhbGc...",
+                 "fcmToken": "dW4f2..."
+               }
+               ```
+
+            **중요:**
+            - ⚠️ idToken과 fcmToken은 서버에서 발급할 수 없습니다
+            - ⚠️ 회원가입 후 반드시 위 2-4 단계를 진행해야 합니다
+            - 이메일 인증은 선택사항 (인증 전에도 로그인 가능)
+
+            **대안 방법 (클라이언트 우선):**
+            1. 클라이언트: Firebase SDK로 직접 회원가입 `createUserWithEmailAndPassword()`
+            2. 클라이언트: ID Token 발급
+            3. 서버: `/api/auth/login` 호출 시 자동으로 DB에 사용자 생성
             """
     )
     @PostMapping("/signup")
@@ -57,6 +83,78 @@ public class AuthController {
                 .body(ApiResponse.success("회원가입이 완료되었습니다", user));
     }
 
+
+    /**
+     * 이메일/비밀번호 로그인 (간편 로그인)
+     * POST /api/auth/login/email
+     *
+     * 서버에서 이메일/비밀번호를 검증하고 Firebase 커스텀 토큰을 발급합니다.
+     * 가장 간단한 로그인 방법입니다.
+     */
+    @Operation(
+        summary = "이메일/비밀번호 로그인 (간편)",
+        description = """
+            이메일과 비밀번호로 간편하게 로그인합니다.
+
+            **사용법:**
+            ```bash
+            POST /api/auth/login/email
+            {
+              "email": "test@inu.ac.kr",
+              "password": "password123",
+              "fcmToken": "dW4f2..." (선택사항)
+            }
+            ```
+
+            **응답:**
+            ```json
+            {
+              "success": true,
+              "data": {
+                "idToken": "eyJhbGc...",  // Firebase 커스텀 토큰
+                "tokenType": "Bearer",
+                "expiresIn": 3600,
+                "user": {
+                  "id": 1,
+                  "email": "test@inu.ac.kr",
+                  "name": "홍길동"
+                }
+              }
+            }
+            ```
+
+            **주의:**
+            - ✅ 회원가입 직후 바로 사용 가능
+            - ✅ Firebase SDK 없이도 로그인 가능
+            - ⚠️ idToken(커스텀 토큰)은 Firebase 로그인 시에만 사용
+            - 💡 API 인증에는 이 토큰을 그대로 사용하세요
+
+            **클라이언트 사용 예시:**
+            ```javascript
+            const response = await fetch('/api/auth/login/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: 'test@inu.ac.kr',
+                password: 'password123'
+              })
+            });
+
+            const { idToken, user } = await response.json();
+
+            // API 요청 시 토큰 사용
+            fetch('/api/notices', {
+              headers: { 'Authorization': `Bearer ${idToken}` }
+            });
+            ```
+            """
+    )
+    @PostMapping("/login/email")
+    public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> loginWithEmail(
+            @Valid @RequestBody AuthDto.EmailLoginRequest request) {
+        AuthDto.LoginResponse response = authService.loginWithEmail(request);
+        return ResponseEntity.ok(ApiResponse.success("로그인 성공", response));
+    }
 
     /**
      * 로그인 (Firebase Authentication)
@@ -176,6 +274,39 @@ public class AuthController {
     @PostMapping("/resend-verification-email")
     public ResponseEntity<ApiResponse<String>> resendVerificationEmail(@RequestParam String email) {
         String message = authService.resendEmailVerification(email);
+        return ResponseEntity.ok(ApiResponse.success(message, null));
+    }
+
+    /**
+     * 비밀번호 재설정 요청 (Firebase)
+     * POST /api/auth/forgot-password
+     *
+     * Firebase를 사용하여 비밀번호 재설정 이메일을 발송합니다.
+     */
+    @Operation(
+        summary = "비밀번호 재설정 요청",
+        description = """
+            비밀번호를 잊어버린 사용자에게 재설정 이메일을 발송합니다.
+
+            **Firebase 기반:**
+            - Firebase Admin SDK로 비밀번호 재설정 링크 생성
+            - 이메일로 재설정 링크 발송
+            - 사용자는 링크를 클릭하여 새 비밀번호 설정
+
+            **사용 방법:**
+            1. 이메일 입력하여 요청
+            2. 이메일로 재설정 링크 수신
+            3. 링크 클릭하여 새 비밀번호 입력
+            4. Firebase에서 자동으로 비밀번호 업데이트
+
+            **제한:**
+            - 동일 이메일로 1시간에 최대 3회까지 요청 가능
+            """
+    )
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(
+            @Valid @RequestBody AuthDto.ForgotPasswordRequest request) {
+        String message = authService.sendPasswordResetEmail(request.getEmail());
         return ResponseEntity.ok(ApiResponse.success(message, null));
     }
 

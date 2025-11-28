@@ -135,6 +135,7 @@ def college_crawl_task(self, job_name: str):
                                 "hits": item.get('hits'),
                                 "category": item.get('category'),
                                 "source": item.get('source'),
+                                "content": item.get('content', ''),  # 본문 추가
                                 "extracted": item,
                                 "raw": json.dumps(item, ensure_ascii=False),
                                 "fingerprint": fingerprint,
@@ -207,6 +208,7 @@ def college_crawl_task(self, job_name: str):
                                 "hits": item.get('hits'),
                                 "category": item.get('category'),
                                 "source": item.get('source'),
+                                "content": item.get('content', ''),  # 본문 추가
                                 "extracted": item,
                                 "raw": json.dumps(item, ensure_ascii=False),
                                 "fingerprint": fingerprint,
