@@ -2,65 +2,65 @@ version: '3.8'
 
 services:
   # PostgreSQL 데이터베이스
-  postgres:
-    image: postgres:16-alpine
-    container_name: incheon-notice-db
-    environment:
-      POSTGRES_DB: incheon_notice
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: incheon-notice-db
+  #   environment:
+  #     POSTGRES_DB: incheon_notice
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
-  # Redis 캐시
-  redis:
-    image: redis:7-alpine
-    container_name: incheon-notice-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # # Redis 캐시
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: incheon-notice-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   # Spring Boot 백엔드
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: incheon-notice-backend
-    ports:
-      - "8080:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/incheon_notice
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      JWT_SECRET: your-super-secret-key-change-this-in-production-minimum-256-bits-for-hs512-algorithm
-      CRAWLER_API_URL: http://crawler:8000
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+  # backend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: incheon-notice-backend
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: dev
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/incheon_notice
+  #     SPRING_DATASOURCE_USERNAME: postgres
+  #     SPRING_DATASOURCE_PASSWORD: postgres
+  #     SPRING_DATA_REDIS_HOST: redis
+  #     SPRING_DATA_REDIS_PORT: 6379
+  #     JWT_SECRET: your-super-secret-key-change-this-in-production-minimum-256-bits-for-hs512-algorithm
+  #     CRAWLER_API_URL: http://crawler:8000
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
 
   # FastAPI 크롤러
   # crawler:
@@ -120,23 +120,23 @@ services:
     depends_on:
       - backend
 
-  treafik:
-    image: traefik:latest
-    container_name: incheon-notice-traefik
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--entrypoints.web.address=:80"
-    ports:
-      - "80:80"
-      - "8081:8080"  # Traefik 대시보드 포트
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+  # treafik:
+  #   image: traefik:latest
+  #   container_name: incheon-notice-traefik
+  #   command:
+  #     - "--api.insecure=true"
+  #     - "--providers.docker=true"
+  #     - "--entrypoints.web.address=:80"
+  #   ports:
+  #     - "80:80"
+  #     - "8081:8080"  # Traefik 대시보드 포트
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
 
       
 volumes:
-  postgres_data:
-  redis_data:
+  # postgres_data:
+  # redis_data:
   pgadmin_data:
   grafana_data:
   prometheus_data:

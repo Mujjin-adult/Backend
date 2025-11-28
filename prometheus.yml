@@ -5,10 +5,29 @@ global:
 scrape_configs:
   - job_name: 'spring-boot'
     metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['backend:8080']
-        labels:
-          application: 'incheon-notice-backend'
+    gce_sd_configs: 
+      - project: 'project-f2639456-81ab-4842-bc5'
+        zone: 'asia-northeast3-a'
+        filter: 'tags: "springboot-backend"'
+    
+    relabel_configs:
+      # Private IP + 포트 8080 설정 (MIG 인스턴스 자동 탐지)
+      - source_labels: [__meta_gce_private_ip]
+        target_label: __address__
+        replacement: '$1:8080'
+
+      # 인스턴스 메타데이터 레이블
+      - source_labels: [__meta_gce_instance_name]
+        target_label: instance
+      - source_labels: [__meta_gce_zone]
+        target_label: zone
+      - source_labels: [__meta_gce_project]
+        target_label: project
+
+      # 애플리케이션 레이블 추가
+      - target_label: application
+        replacement: 'incheon-notice-backend'
+
   - job_name: 'celery'
     static_configs:
       - targets: ['celery-exporter:9808']
