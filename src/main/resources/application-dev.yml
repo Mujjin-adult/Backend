@@ -5,7 +5,12 @@ spring:
       ddl-auto: update  # 테이블 자동 생성/수정
     show-sql: true
 
+# Firebase 설정 (개발 환경)
+fcm:
+  credentials-path: ${FCM_CREDENTIALS_PATH:./firebase-credentials.json}
+
 logging:
   level:
     com.incheon.notice: DEBUG
     org.springframework.security: DEBUG
+    com.google.firebase: DEBUG

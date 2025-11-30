@@ -38,4 +38,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * FCM 토큰으로 사용자 조회
      */
     Optional<User> findByFcmToken(String fcmToken);
+
+    /**
+     * 이름과 학번으로 사용자 조회 (아이디 찾기용)
+     */
+    Optional<User> findByNameAndStudentId(String name, String studentId);
+
+    /**
+     * Firebase UID로 사용자 조회
+     */
+    Optional<User> findByFirebaseUid(String firebaseUid);
+
+    /**
+     * Firebase UID 존재 여부 확인
+     */
+    boolean existsByFirebaseUid(String firebaseUid);
 }

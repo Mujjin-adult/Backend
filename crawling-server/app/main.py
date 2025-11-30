@@ -4,16 +4,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import time
 import uuid
+from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse
 
 from api import router as api_router
 from logging_config import init_logging, log_request
+from database import init_database
 from config import get_settings, validate_settings
 from auto_scheduler import init_college_scheduler
+from sentry_config import init_sentry
 
 # 로깅 시스템 초기화
 init_logging()
+
+# Sentry 초기화
+init_sentry()
 
 # 설정 유효성 검사
 try:
@@ -26,36 +32,44 @@ except Exception as e:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """애플리케이션 생명주기 관리"""
-    import logging
-    logger = logging.getLogger(__name__)
-
     # 시작 시
-    logger.info("Starting College Notice Crawler...")
+    print("Starting College Notice Crawler...")
+
+    # 데이터베이스 초기화
+    if init_database():
+        print("Database initialized successfully")
+    else:
+        print("Database initialization failed")
 
     # 대학 크롤링 스케줄러 초기화
     if init_college_scheduler():
-        logger.info("College scheduler initialized successfully")
+        print("College scheduler initialized successfully")
     else:
-        logger.warning("College scheduler initialization failed")
+        print("College scheduler initialization failed")
 
-    logger.info("Application startup completed")
+    print("Application startup completed")
 
     yield
 
     # 종료 시
-    logger.info("Shutting down College Notice Crawler...")
+    print("Shutting down College Notice Crawler...")
 
 
 # FastAPI 앱 생성
 app = FastAPI(
-    title="College Notice Crawler API",
-    description="대학 공지사항을 수집하는 크롤링 시스템",
+    title="인천대학교 공지사항 크롤링 서버 API",
+    description="인천대학교 공지사항을 자동으로 수집하고 관리하는 크롤링 시스템",
     version="1.0.0",
     lifespan=lifespan,
 )
 
 # 보안 미들웨어 설정
 from middleware.security import add_security_headers, RateLimiter, IPBlocker, verify_api_key
+from middleware import MetricsMiddleware
+from metrics import metrics_endpoint
+
+# Metrics 미들웨어 (가장 먼저 추가)
+app.add_middleware(MetricsMiddleware)
 
 # CORS 미들웨어
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
@@ -68,7 +82,7 @@ app.add_middleware(
 )
 
 # 신뢰할 수 있는 호스트 미들웨어
-allowed_hosts = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+allowed_hosts = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,fastapi,*").split(",")
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
 # 보안 헤더 미들웨어
@@ -107,14 +121,11 @@ async def security_middleware(request: Request, call_next):
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     """요청 처리 시간 측정 및 로깅"""
-    import logging
-    logger = logging.getLogger(__name__)
-
     request_id = str(uuid.uuid4())
     start_time = time.time()
 
     # 요청 시작 로깅
-    logger.info(f"Request {request_id} started: {request.method} {request.url}")
+    print(f"Request {request_id} started: {request.method} {request.url}")
 
     response = await call_next(request)
 
@@ -131,156 +142,323 @@ async def add_process_time_header(request: Request, call_next):
 
 
 # API 라우터 등록
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router)
 
 
-@app.get("/")
+@app.get(
+    "/",
+    tags=["시스템 정보"],
+    summary="API 정보 조회",
+    description="크롤링 서버의 기본 정보를 반환합니다."
+)
 async def root():
     """루트 엔드포인트"""
     return {
-        "message": "College Notice Crawler API",
+        "message": "인천대학교 공지사항 크롤링 서버 API",
         "version": "1.0.0",
         "status": "running",
     }
 
 
-@app.get("/health")
+@app.get(
+    "/metrics",
+    tags=["모니터링"],
+    summary="시스템 메트릭 조회",
+    description="Prometheus 형식의 시스템 메트릭을 반환합니다 (HTTP 요청, 크롤러 통계, Circuit Breaker 등)."
+)
+async def metrics():
+    """
+    Prometheus 메트릭 엔드포인트
+
+    시스템 메트릭 수집:
+    - HTTP 요청/응답
+    - 크롤러 실행 통계
+    - Circuit Breaker 상태
+    - 데이터베이스 쿼리
+    """
+    return metrics_endpoint()
+
+
+@app.get(
+    "/health",
+    tags=["시스템 상태"],
+    summary="전체 시스템 헬스 체크",
+    description="데이터베이스, Redis, Celery Worker의 상태를 종합적으로 확인합니다."
+)
 async def health_check():
-    """헬스 체크"""
-    return {"status": "healthy", "timestamp": time.time()}
+    """
+    헬스 체크 엔드포인트
+
+    시스템 상태 확인:
+    - 데이터베이스 연결
+    - Redis 연결
+    - Celery 워커 상태
+
+    Returns:
+        HealthCheckResponse 형식의 응답
+    """
+    from app.schemas import HealthCheckResponse
+    from database import engine
+    from celery import Celery
+    from config import get_redis_url
+    import redis
+    from sqlalchemy import text
+
+    # 데이터베이스 연결 확인
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_healthy = True
+    except Exception as e:
+        print(f"Database health check failed: {e}")
+        db_healthy = False
+
+    # Redis 연결 확인
+    try:
+        redis_url = get_redis_url()
+        r = redis.from_url(redis_url)
+        r.ping()
+        redis_healthy = True
+    except Exception:
+        redis_healthy = False
+
+    # Celery 워커 수 확인
+    try:
+        celery_app = Celery(broker=get_redis_url())
+        stats = celery_app.control.inspect().stats()
+        worker_count = len(stats) if stats else 0
+    except Exception:
+        worker_count = 0
+
+    return {
+        "status": "healthy" if (db_healthy and redis_healthy) else "degraded",
+        "timestamp": datetime.now(),
+        "version": "1.0.0",
+        "database": db_healthy,
+        "redis": redis_healthy,
+        "celery_workers": worker_count
+    }
 
 
-@app.get("/test-crawlers")
+@app.get(
+    "/test-crawlers",
+    tags=["크롤러 실행"],
+    summary="크롤러 실시간 테스트",
+    description="실제 웹사이트에 접속하여 크롤러가 정상 동작하는지 테스트합니다."
+)
 async def test_crawlers():
     """크롤러 테스트 엔드포인트"""
-    from college_crawlers import get_college_crawler
+    from auto_scheduler import get_auto_scheduler
 
     try:
-        crawler = get_college_crawler()
-
-        # 각 카테고리별로 1개씩 테스트
-        test_results = {}
-        categories = ["volunteer", "scholarship", "general_events", "educational_test",
-                     "tuition_payment", "academic_credit", "degree"]
-
-        for category in categories:
-            try:
-                method = getattr(crawler, f"crawl_{category}")
-                results = method()
-                test_results[category] = {
-                    "status": "success",
-                    "count": len(results) if results else 0
-                }
-            except Exception as e:
-                test_results[category] = {
-                    "status": "error",
-                    "error": str(e)
-                }
-
+        scheduler = get_auto_scheduler()
+        results = scheduler.test_crawlers()
         return {
             "status": "success",
-            "message": "All crawlers tested successfully",
-            "results": test_results,
+            "message": "Crawler test completed",
+            "results": results,
         }
     except Exception as e:
         return {"status": "error", "message": f"Crawler test failed: {str(e)}"}
 
 
-@app.post("/run-crawler/{category}")
-async def run_crawler(category: str, api_key: str = Depends(verify_api_key)):
-    """특정 카테고리 크롤러 수동 실행 및 Spring Boot로 전송"""
-    import logging
-    from college_crawlers import get_college_crawler
+@app.post(
+    "/run-crawler/{category}",
+    tags=["크롤러 실행"],
+    summary="카테고리별 크롤러 수동 실행",
+    description="특정 카테고리 또는 전체 카테고리의 크롤러를 즉시 실행합니다 (API Key 필요)."
+)
+async def run_crawler(
+    category: str,
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    특정 카테고리 크롤러 수동 실행 (Celery 태스크 트리거)
 
-    logger = logging.getLogger(__name__)
+    - **category**: 크롤링 카테고리 (volunteer, job, scholarship, etc.) 또는 'all'
+    - 인증 필요: X-API-Key 헤더
+
+    Returns:
+        CrawlerTriggerResponse 형식의 응답
+    """
+    from tasks import college_crawl_task
+    from database import get_db_context
+    from crud import get_jobs
+    from app.schemas import CrawlerTriggerResponse
 
     try:
-        crawler = get_college_crawler()
+        # 카테고리에 해당하는 job 찾기
+        with get_db_context() as db:
+            jobs = get_jobs(db)
 
-        # 크롤링 실행
-        if category == "volunteer":
-            results = crawler.crawl_volunteer()
-        elif category == "job":
-            results = crawler.crawl_job()
-        elif category == "scholarship":
-            results = crawler.crawl_scholarship()
-        elif category == "general_events":
-            results = crawler.crawl_general_events()
-        elif category == "educational_test":
-            results = crawler.crawl_educational_test()
-        elif category == "tuition_payment":
-            results = crawler.crawl_tuition_payment()
-        elif category == "academic_credit":
-            results = crawler.crawl_academic_credit()
-        elif category == "degree":
-            results = crawler.crawl_degree()
-        elif category == "all":
-            results = crawler.crawl_all()
-        else:
-            return {"status": "error", "message": f"Unknown category: {category}"}
+            # 카테고리별 job 이름 매핑
+            category_names = {
+                "volunteer": "봉사 공지사항 크롤링",
+                "job": "취업 공지사항 크롤링",
+                "scholarship": "장학금 공지사항 크롤링",
+                "general_events": "일반행사/채용 크롤링",
+                "educational_test": "교육시험 크롤링",
+                "tuition_payment": "등록금납부 크롤링",
+                "academic_credit": "학점 크롤링",
+                "degree": "학위 크롤링",
+            }
 
-        # 데이터베이스에 직접 저장
-        saved_count = 0
-        failed_count = 0
-        total_crawled = 0
+            triggered_tasks = []
 
-        # 전체 크롤링인 경우 딕셔너리, 개별 크롤링인 경우 리스트
-        if category == "all" and isinstance(results, dict):
-            # 전체 크롤링: 각 카테고리별로 처리
-            for cat_name, cat_results in results.items():
-                if cat_results and isinstance(cat_results, list):
-                    total_crawled += len(cat_results)
-                    logger.info(f"{cat_name} 카테고리: {len(cat_results)}개 데이터 저장 시작...")
+            if category == "all":
+                # 모든 카테고리 실행
+                for job in jobs:
+                    task = college_crawl_task.delay(job.name)
+                    triggered_tasks.append({
+                        "job_name": job.name,
+                        "job_id": job.id,
+                        "task_id": task.id
+                    })
+            else:
+                # 특정 카테고리만 실행
+                job_name = category_names.get(category)
+                if not job_name:
+                    return {"status": "error", "message": f"Unknown category: {category}"}
 
-                    for notice in cat_results:
-                        if crawler.save_to_database(notice):
-                            saved_count += 1
-                        else:
-                            failed_count += 1
+                target_job = next((j for j in jobs if j.name == job_name), None)
+                if not target_job:
+                    return {"status": "error", "message": f"Job not found for category: {category}"}
 
-            logger.info(f"전체 저장 완료: 성공 {saved_count}개, 실패 {failed_count}개")
+                task = college_crawl_task.delay(target_job.name)
+                triggered_tasks.append({
+                    "job_name": target_job.name,
+                    "job_id": target_job.id,
+                    "task_id": task.id
+                })
 
-        elif results and isinstance(results, list):
-            # 개별 카테고리 크롤링
-            total_crawled = len(results)
-            logger.info(f"데이터베이스에 {total_crawled}개 데이터 저장 시작...")
-
-            for notice in results:
-                if crawler.save_to_database(notice):
-                    saved_count += 1
-                else:
-                    failed_count += 1
-
-            logger.info(f"저장 완료: 성공 {saved_count}개, 실패 {failed_count}개")
-
-        return {
-            "status": "success",
-            "category": category,
-            "crawled_count": total_crawled,
-            "saved_to_database": saved_count,
-            "failed_to_save": failed_count,
-            "message": f"크롤링 완료. {saved_count}개 항목을 데이터베이스에 저장함.",
-        }
+            return {
+                "status": "success",
+                "category": category,
+                "message": "Crawling tasks triggered",
+                "tasks": triggered_tasks,
+                "count": len(triggered_tasks)
+            }
 
     except Exception as e:
-        logger.error(f"크롤링 실행 실패: {str(e)}")
         return {"status": "error", "message": f"Crawler execution failed: {str(e)}"}
 
 
-@app.post("/force-schedule-update")
-async def force_schedule_update(api_key: str = Depends(verify_api_key)):
+@app.post(
+    "/force-schedule-update",
+    tags=["크롤러 실행"],
+    summary="스케줄 강제 업데이트",
+    description="Celery Beat 스케줄을 데이터베이스 정보와 동기화합니다."
+)
+async def force_schedule_update():
     """Celery 스케줄 강제 업데이트"""
-    from auto_scheduler import CollegeAutoScheduler
+    from auto_scheduler import get_auto_scheduler
 
     try:
-        scheduler = CollegeAutoScheduler()
-        scheduler.update_celery_beat_schedule()
+        scheduler = get_auto_scheduler()
+        scheduler.update_celery_schedule()
         return {"status": "success", "message": "Schedule updated successfully"}
     except Exception as e:
         return {"status": "error", "message": f"Schedule update failed: {str(e)}"}
 
 
-@app.get("/dashboard")
+@app.get(
+    "/test-sentry",
+    tags=["시스템 정보"],
+    summary="Sentry 연동 테스트",
+    description="Sentry와 Slack 연동을 테스트하기 위한 에러를 발생시킵니다."
+)
+async def test_sentry():
+    """Sentry 테스트 엔드포인트"""
+    from sentry_config import track_crawler_error, capture_message_with_level
+    from slack_notify import send_slack_alert
+
+    # 정보 메시지 전송
+    capture_message_with_level(
+        "Sentry 연동 테스트: 정보 메시지",
+        level="info",
+        context={
+            "test_type": "info_message",
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+    # 크롤러 에러 테스트
+    track_crawler_error(
+        category="test",
+        error_type="TestError",
+        url="http://localhost:8001/test-sentry",
+        exception=Exception("🧪 Sentry와 Slack 연동 테스트입니다!"),
+        extra_data={
+            "test_purpose": "Sentry-Slack integration test",
+            "expected_result": "Slack notification should appear"
+        }
+    )
+
+    # Slack 직접 알림 전송
+    slack_enabled = os.getenv("ENABLE_SLACK_NOTIFICATIONS", "false").lower() == "true"
+    slack_sent = False
+
+    if slack_enabled:
+        slack_message = (
+            "🧪 *크롤링 서버 테스트 알림*\n\n"
+            "✅ Sentry-Slack 연동 테스트가 실행되었습니다!\n\n"
+            f"• 시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            "• 환경: development\n"
+            "• URL: http://localhost:8001/test-sentry\n\n"
+            "이 메시지가 보인다면 Slack 알림이 정상적으로 작동하고 있습니다! 🎉"
+        )
+        slack_sent = send_slack_alert(slack_message)
+
+    return {
+        "status": "success",
+        "message": "테스트 이벤트를 Sentry로 전송했습니다!",
+        "slack_notification": "전송됨" if slack_sent else "비활성화 또는 실패",
+        "instructions": [
+            "1. Sentry 대시보드(https://sentry.io)에서 이벤트를 확인하세요",
+            "2. Slack 채널에서 알림을 확인하세요",
+            "3. 알림이 오지 않으면 Alert Rules를 확인하세요"
+        ]
+    }
+
+
+@app.get(
+    "/test-daily-report",
+    tags=["시스템 정보"],
+    summary="일일 리포트 테스트",
+    description="일일 요약 리포트를 즉시 생성하여 Slack으로 전송합니다."
+)
+async def test_daily_report():
+    """일일 리포트 테스트 엔드포인트"""
+    try:
+        from tasks import send_daily_report
+
+        # 백그라운드에서 실행
+        result = send_daily_report.apply_async()
+
+        return {
+            "status": "success",
+            "message": "일일 리포트 생성 작업이 시작되었습니다!",
+            "task_id": result.id,
+            "instructions": [
+                "1. Slack 채널에서 리포트를 확인하세요",
+                "2. 리포트에는 어제 수집된 문서 통계가 포함됩니다",
+                "3. 매일 오전 9시에 자동으로 전송됩니다"
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Failed to trigger daily report: {e}")
+        return {
+            "status": "error",
+            "message": f"일일 리포트 생성 실패: {str(e)}"
+        }
+
+
+@app.get(
+    "/dashboard",
+    tags=["모니터링"],
+    summary="웹 대시보드",
+    description="크롤링 데이터를 시각화하는 HTML 대시보드를 제공합니다."
+)
 async def dashboard():
     """크롤링 데이터 대시보드"""
     html_content = """
@@ -492,18 +670,34 @@ async def dashboard():
             }
             
             async function runAllCrawlers() {
+                // API 키 입력 받기
+                const apiKey = prompt('API 키를 입력하세요:');
+                if (!apiKey) {
+                    alert('API 키가 필요합니다.');
+                    return;
+                }
+
                 try {
-                    const response = await fetch('/run-crawler/all', {method: 'POST'});
+                    const response = await fetch('/run-crawler/all', {
+                        method: 'POST',
+                        headers: {
+                            'X-API-Key': apiKey
+                        }
+                    });
                     const data = await response.json();
                     
-                    document.getElementById('management-results').innerHTML = 
-                        `<h3>전체 크롤링 실행 결과</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
-                    
-                    // 잠시 후 통계와 최근 문서 새로고침
+                    document.getElementById('management-results').innerHTML =
+                        `<h3>전체 크롤링 실행 결과</h3>
+                        <p>백그라운드에서 크롤링 작업이 시작되었습니다. 약 10초 후 자동으로 통계가 업데이트됩니다.</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+                    // 크롤링 완료를 위해 충분한 시간 대기 후 새로고침
                     setTimeout(() => {
                         loadStats();
                         loadRecentDocuments();
-                    }, 2000);
+                        document.getElementById('management-results').innerHTML +=
+                            '<p style="color: green;">✓ 통계와 최근 문서가 업데이트되었습니다.</p>';
+                    }, 10000);
                 } catch (error) {
                     document.getElementById('management-results').innerHTML = 
                         `<p>전체 크롤링 실행 실패: ${error.message}</p>`;

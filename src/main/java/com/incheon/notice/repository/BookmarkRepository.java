@@ -25,21 +25,26 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
     /**
      * 사용자 ID로 북마크 목록 조회
      */
-    @Query("SELECT b FROM Bookmark b JOIN FETCH b.notice WHERE b.user.id = :userId ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Bookmark b JOIN FETCH b.crawlNotice WHERE b.user.id = :userId ORDER BY b.createdAt DESC")
     Page<Bookmark> findByUserIdWithNotice(@Param("userId") Long userId, Pageable pageable);
 
     /**
      * 사용자가 특정 공지사항을 북마크했는지 확인
      */
-    boolean existsByUserIdAndNoticeId(Long userId, Long noticeId);
+    boolean existsByUserIdAndCrawlNoticeId(Long userId, Long crawlNoticeId);
 
     /**
      * 사용자와 공지사항으로 북마크 조회
      */
-    Optional<Bookmark> findByUserIdAndNoticeId(Long userId, Long noticeId);
+    Optional<Bookmark> findByUserIdAndCrawlNoticeId(Long userId, Long crawlNoticeId);
 
     /**
      * 사용자의 북마크 개수
      */
     long countByUserId(Long userId);
+
+    /**
+     * 사용자 이메일과 공지사항 ID로 북마크 존재 여부 확인
+     */
+    boolean existsByUser_EmailAndCrawlNotice_Id(String email, Long crawlNoticeId);
 }

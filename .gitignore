@@ -4,6 +4,8 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
+gradle-app.setting
+.gradletasknamecache
 
 # IntelliJ IDEA
 .idea/
@@ -11,30 +13,109 @@ build/
 *.iml
 *.ipr
 out/
+.idea_modules/
+atlassian-ide-plugin.xml
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
 
 # Eclipse
 .classpath
 .project
 .settings/
 bin/
+.metadata
+.recommenders
+.apt_generated/
+.factorypath
 
 # VS Code
 .vscode/
+*.code-workspace
 
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
 
 # Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
 
-# 로그
+# 로그 파일
 *.log
+logs/
+*.log.*
+application.log
 
-# 환경변수 및 비밀키
+# 환경변수 및 비밀키 (중요!)
 .env
-firebase-credentials.json
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
 
-# Python
+# Firebase 서비스 계정 키 (절대 커밋하지 마세요!)
+firebase-credentials.json
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+serviceAccountKey.json
+google-services.json
+GoogleService-Info.plist
+
+# Spring Boot
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Spring Boot DevTools
+spring-boot-devtools.properties
+
+# H2 Database
+*.h2.db
+*.trace.db
+
+# 임시 파일
+*.tmp
+*.tmp.*
+*.swp
+*.swo
+*~
+.cache/
+temp/
+tmp/
+
+# Python (크롤링 서버용)
 __pycache__/
 *.py[cod]
 *$py.class
@@ -43,10 +124,59 @@ __pycache__/
 venv/
 ENV/
 env/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+*.egg-info/
+dist/
+build/
+*.egg
 
 # Docker
 *.pid
+docker-compose.override.yml
 
 # 데이터베이스
 *.db
 *.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Redis
+dump.rdb
+
+# 민감한 설정 파일
+application-secret.yml
+application-secret.properties
+application-local.yml
+application-local.properties
+
+# 테스트 결과
+test-output/
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# 기타
+node_modules/
+.npm
+.eslintcache
+*.bak
+*.gho
+*.ori
+*.orig
+*.rej
