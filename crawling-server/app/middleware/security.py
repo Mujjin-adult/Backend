@@ -1,20 +1,47 @@
-from fastapi import Request, Depends
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, Depends
 from fastapi.security import APIKeyHeader
 from typing import List, Optional
 import time
+import hashlib
+import hmac
+import secrets
 from collections import defaultdict
-import os
+import logging
+
+from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 # API 키 검증
-api_key_header = APIKeyHeader(name="X-API-Key")
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
-async def verify_api_key(api_key: str = Depends(api_key_header)):
-    if api_key != os.getenv("API_KEY"):
+
+async def verify_api_key(api_key: Optional[str] = Depends(api_key_header)):
+    """
+    API 키 검증 의존성
+
+    - 타이밍 공격 방지를 위한 constant-time 비교 사용
+    - 잘못된 API 키 시도 로깅
+    """
+    settings = get_settings()
+    expected_key = settings.security.api_key
+
+    if not api_key:
+        logger.warning("API request without API key")
+        raise HTTPException(
+            status_code=401,
+            detail="API key is required",
+            headers={"WWW-Authenticate": "ApiKey"}
+        )
+
+    # Constant-time comparison to prevent timing attacks
+    if not secrets.compare_digest(api_key, expected_key):
+        logger.warning(f"Invalid API key attempt: {api_key[:8]}...")
         raise HTTPException(
             status_code=403,
             detail="Invalid API key"
         )
+
     return api_key
 
 # 레이트 리미팅
@@ -22,16 +49,10 @@ class RateLimiter:
     def __init__(self, requests_per_minute: int = 60):
         self.requests_per_minute = requests_per_minute
         self.requests = defaultdict(list)
-        self.last_cleanup = time.time()
 
     async def check_rate_limit(self, client_ip: str) -> bool:
         now = time.time()
         minute_ago = now - 60
-
-        # 주기적으로 오래된 IP 항목 정리 (10분마다)
-        if now - self.last_cleanup > 600:
-            self._cleanup_old_ips(now)
-            self.last_cleanup = now
 
         # 1분 이전의 요청 제거
         self.requests[client_ip] = [
@@ -39,27 +60,12 @@ class RateLimiter:
             if req_time > minute_ago
         ]
 
-        # 빈 항목 제거
-        if not self.requests[client_ip]:
-            del self.requests[client_ip]
-            return True
-
         # 요청 수 확인
         if len(self.requests[client_ip]) >= self.requests_per_minute:
             return False
 
         self.requests[client_ip].append(now)
         return True
-
-    def _cleanup_old_ips(self, now: float):
-        """5분 이상 요청이 없는 IP 제거 (메모리 누수 방지)"""
-        five_minutes_ago = now - 300
-        ips_to_remove = [
-            ip for ip, times in self.requests.items()
-            if not times or max(times) < five_minutes_ago
-        ]
-        for ip in ips_to_remove:
-            del self.requests[ip]
 
 # 보안 헤더 미들웨어
 async def add_security_headers(request: Request, call_next):
@@ -71,18 +77,23 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-    # Swagger UI(/docs)와 OpenAPI JSON(/openapi.json)은 CDN 리소스 허용
-    if request.url.path in ["/docs", "/openapi.json", "/redoc"]:
+    # Swagger UI와 ReDoc을 위한 CSP 설정 (CDN 허용)
+    # /docs 또는 /redoc 경로에서는 더 관대한 CSP 적용
+    if request.url.path in ["/docs", "/redoc", "/openapi.json"]:
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "img-src 'self' data: https://fastapi.tiangolo.com; "
-            "font-src 'self' https://cdn.jsdelivr.net;"
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https://cdn.jsdelivr.net https://fastapi.tiangolo.com;"
         )
     else:
-        # 다른 경로는 엄격한 CSP 유지
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+        # 일반 페이지는 더 엄격한 CSP 적용
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline';"
+        )
 
     return response
 

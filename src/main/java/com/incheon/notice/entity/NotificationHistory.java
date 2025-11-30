@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "notification_history", indexes = {
     @Index(name = "idx_notif_user_id", columnList = "user_id"),
-    @Index(name = "idx_notif_notice_id", columnList = "notice_id"),
+    @Index(name = "idx_notif_crawl_notice_id", columnList = "crawl_notice_id"),
     @Index(name = "idx_notif_sent_at", columnList = "sent_at")
 })
 @Getter
@@ -30,8 +30,8 @@ public class NotificationHistory {
     private User user;  // 알림을 받은 사용자
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "notice_id", nullable = false)
-    private Notice notice;  // 알림 대상 공지사항
+    @JoinColumn(name = "crawl_notice_id", nullable = false)
+    private CrawlNotice crawlNotice;  // 알림 대상 크롤링 공지사항
 
     @Column(nullable = false, length = 200)
     private String title;  // 알림 제목

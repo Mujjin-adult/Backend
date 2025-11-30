@@ -2,8 +2,10 @@ import logging
 import logging.handlers
 import sys
 import os
+import json
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 from config import get_monitoring_config
 
 # 로그 포맷터
@@ -11,6 +13,44 @@ DEFAULT_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DETAILED_FORMAT = (
     "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
 )
+
+
+class JSONFormatter(logging.Formatter):
+    """JSON 형식의 로그 포맷터 (프로덕션 환경용)"""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """로그 레코드를 JSON 형식으로 변환"""
+        log_data: Dict[str, Any] = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+
+        # 프로세스 및 쓰레드 정보
+        if record.process:
+            log_data["process_id"] = record.process
+        if record.thread:
+            log_data["thread_id"] = record.thread
+
+        # 예외 정보
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+
+        # 추가 컨텍스트
+        if hasattr(record, "job_id"):
+            log_data["job_id"] = record.job_id
+        if hasattr(record, "category"):
+            log_data["category"] = record.category
+        if hasattr(record, "url"):
+            log_data["url"] = record.url
+        if hasattr(record, "extra_data"):
+            log_data["extra"] = record.extra_data
+
+        return json.dumps(log_data, ensure_ascii=False)
 
 # 로그 파일 경로
 LOG_DIR = Path("logs")
@@ -50,6 +90,7 @@ def setup_logging(
     enable_rotation: bool = True,
     max_bytes: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
+    use_json_format: bool = None,  # JSON 포맷 사용 여부
 ):
     """로깅 시스템 설정"""
 
@@ -60,6 +101,11 @@ def setup_logging(
             log_level = config.get("log_level", "INFO")
         except Exception:
             log_level = "INFO"
+
+    # JSON 포맷 사용 여부 결정
+    if use_json_format is None:
+        log_format = os.getenv("LOG_FORMAT", "text")
+        use_json_format = log_format.lower() == "json"
 
     # 로그 레벨 파싱
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
@@ -73,8 +119,12 @@ def setup_logging(
         root_logger.removeHandler(handler)
 
     # 포맷터 생성
-    console_formatter = ColoredFormatter(DEFAULT_FORMAT)
-    file_formatter = logging.Formatter(DETAILED_FORMAT)
+    if use_json_format:
+        console_formatter = JSONFormatter()
+        file_formatter = JSONFormatter()
+    else:
+        console_formatter = ColoredFormatter(DEFAULT_FORMAT)
+        file_formatter = logging.Formatter(DETAILED_FORMAT)
 
     # 콘솔 핸들러
     if enable_console:
