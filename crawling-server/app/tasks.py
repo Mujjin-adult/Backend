@@ -668,18 +668,69 @@ def send_daily_report():
 
 # Beat 스케줄러 등록
 celery_app.conf.beat_schedule = {
-    "refresh-job-1": {
-        "task": "tasks.crawl_task",
-        "schedule": crontab(minute="*/15"),  # 15분마다
-        "args": (1, "https://example.com/sitemap.xml", "P1", "AUTO"),
+    # ==================== 대학 공지사항 크롤링 스케줄 ====================
+    # 봉사 공지사항 (2시간마다)
+    "college-봉사-공지사항-크롤링": {
+        "task": "tasks.college_crawl_task",
+        "schedule": crontab(minute=0, hour="*/2"),
+        "args": ("봉사 공지사항 크롤링",),
         "options": {"priority": PRIORITY_MAP["P1"]},
     },
+    # 취업 공지사항 (3시간마다)
+    "college-취업-공지사항-크롤링": {
+        "task": "tasks.college_crawl_task",
+        "schedule": crontab(minute=0, hour="*/3"),
+        "args": ("취업 공지사항 크롤링",),
+        "options": {"priority": PRIORITY_MAP["P1"]},
+    },
+    # 장학금 공지사항 (4시간마다)
+    "college-장학금-공지사항-크롤링": {
+        "task": "tasks.college_crawl_task",
+        "schedule": crontab(minute=0, hour="*/4"),
+        "args": ("장학금 공지사항 크롤링",),
+        "options": {"priority": PRIORITY_MAP["P1"]},
+    },
+    # 일반행사/채용 (6시간마다)
+    "college-일반행사-채용-크롤링": {
+        "task": "tasks.college_crawl_task",
+        "schedule": crontab(minute=0, hour="*/6"),
+        "args": ("일반행사/채용 크롤링",),
+        "options": {"priority": PRIORITY_MAP["P2"]},
+    },
+    # 교육시험 (6시간마다)
+    "college-교육시험-크롤링": {
+        "task": "tasks.college_crawl_task",
+        "schedule": crontab(minute=0, hour="*/6"),
+        "args": ("교육시험 크롤링",),
+        "options": {"priority": PRIORITY_MAP["P2"]},
+    },
+    # 등록금납부 (8시간마다)
+    "college-등록금납부-크롤링": {
+        "task": "tasks.college_crawl_task",
+        "schedule": crontab(minute=0, hour="*/8"),
+        "args": ("등록금납부 크롤링",),
+        "options": {"priority": PRIORITY_MAP["P2"]},
+    },
+    # 학점 (8시간마다)
+    "college-학점-크롤링": {
+        "task": "tasks.college_crawl_task",
+        "schedule": crontab(minute=0, hour="*/8"),
+        "args": ("학점 크롤링",),
+        "options": {"priority": PRIORITY_MAP["P2"]},
+    },
+    # 학위 (8시간마다)
+    "college-학위-크롤링": {
+        "task": "tasks.college_crawl_task",
+        "schedule": crontab(minute=0, hour="*/8"),
+        "args": ("학위 크롤링",),
+        "options": {"priority": PRIORITY_MAP["P2"]},
+    },
+    # ==================== 시스템 태스크 ====================
     # 일일 요약 리포트 (매일 오전 9시)
     "daily-report": {
         "task": "tasks.send_daily_report",
-        "schedule": crontab(hour=9, minute=0),  # 매일 오전 9시
+        "schedule": crontab(hour=9, minute=0),
     },
-    # 추가 잡/스케줄 등록 가능
 }
 
 # 리프레시/데드레터 큐/우선순위 큐 등은 celery 설정에서 routing/queue로 확장 가능
