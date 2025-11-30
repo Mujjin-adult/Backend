@@ -47,8 +47,9 @@ class CollegeAutoScheduler:
                 "priority": "P1",
                 "seed_type": SeedType.URL_LIST,
                 "seed_payload": {
-                    "urls": ["https://www.inu.ac.kr/employment/inu/employmentlist.do"],
+                    "urls": ["https://www.inu.ac.kr/bbs/inu/248/artclList.do"],
                     "category": "job",
+                    "page_num": "248",
                 },
                 "render_mode": RenderMode.STATIC,
                 "robots_policy": RobotsPolicy.OBEY,

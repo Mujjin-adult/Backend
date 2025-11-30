@@ -328,54 +328,15 @@ class CollegeCrawler:
         except Exception as e:
             logger.error(f"Error crawling volunteer: {e}")
             return []
-    def crawl_job(self, max_pages: Optional[int] = None) -> List[Dict[str, Any]]:
-        """취업 크롤링 (다중 페이지 지원)"""
-        url = f"{self.base_url}/employment/inu/employmentlist.do"
-        max_pages = max_pages or self.max_pages
-        all_results = []
-
-        for page in range(1, max_pages + 1):
-            try:
-                payload = {"page": str(page)}
-
-                # 재시도 로직이 포함된 요청
-                response = self._make_request_with_retry(url, payload)
-
-                soup = BeautifulSoup(response.text, "html.parser")
-                rows = soup.select("table tbody tr")
-
-                if not rows:
-                    logger.info(f"No more data at page {page}, stopping")
-                    break
-
-                page_results = []
-                for row in rows:
-                    item = self._parse_row(row, None, "job")
-                    if item:
-                        page_results.append(item)
-
-                all_results.extend(page_results)
-                logger.info(f"Job page {page}: {len(page_results)} items collected")
-
-                if page < max_pages:
-                    time.sleep(random.uniform(1, 3))
-
-            except Exception as e:
-                # 통합 에러 처리
-                should_break = self._handle_crawler_exception(
-                    exception=e,
-                    source="job",
-                    url=url,
-                    page=page,
-                    should_break=True
-                )
-                if should_break:
-                    break
-                else:
-                    continue
-
-        logger.info(f"Job crawling completed: {len(all_results)} items")
-        return all_results
+    def crawl_job(self, page_num: str = "248", max_pages: Optional[int] = None) -> List[Dict[str, Any]]:
+        """취업 크롤링 (다중 페이지 지원) - 취업/채용 공지"""
+        try:
+            result = self._crawl_generic(page_num, "취업", "job", max_pages)
+            logger.info(f"Job crawling completed: {len(result)} items")
+            return result
+        except Exception as e:
+            logger.error(f"Error crawling job: {e}")
+            return []
     def crawl_scholarship(self, page_num: str = "249", max_pages: Optional[int] = None) -> List[Dict[str, Any]]:
         """장학금 크롤링 (다중 페이지 지원)"""
         try:
