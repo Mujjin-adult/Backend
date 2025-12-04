@@ -10,7 +10,7 @@
 | **Swagger UI** | http://localhost:8080/swagger-ui/index.html | 8080 | Spring Boot API 문서 |
 | **PostgreSQL** | localhost:5432 | 5432 | **통합 데이터베이스** (메인 + 크롤러) |
 | **Redis** | localhost:6379 | 6379 | **통합 캐시 서버** (메인 + 크롤러) |
-| **pgAdmin** | http://localhost:5050 | 5050 | PostgreSQL 관리 도구 |
+| **pgAdmin** | http://localhost:550 | 5050 | PostgreSQL 관리 도구 |
 | **Grafana** | http://localhost:3000 | 3000 | 메인 서버 모니터링 대시보드 |
 | **Prometheus** | http://localhost:9090 | 9090 | 메인 서버 메트릭 수집 |
 4

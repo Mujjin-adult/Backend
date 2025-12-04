@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -139,7 +138,7 @@ public class SearchService {
             query.setParameter("categoryId", categoryId);
         }
 
-        return ((BigInteger) query.getSingleResult()).longValue();
+        return ((Number) query.getSingleResult()).longValue();
     }
 
     /**
@@ -158,7 +157,7 @@ public class SearchService {
         sql.append("  id, ");
         sql.append("  ts_headline('simple', title, to_tsquery('simple', :tsquery), ");
         sql.append("    'StartSel=<mark>, StopSel=</mark>, MaxWords=10, MinWords=5') AS highlighted_title, ");
-        sql.append("  ts_headline('simple', COALESCE(content, ''), to_tsquery('simple', :tsquery'), ");
+        sql.append("  ts_headline('simple', COALESCE(content, ''), to_tsquery('simple', :tsquery), ");
         sql.append("    'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15, MaxFragments=1') AS highlighted_content, ");
         sql.append("  url, ");
         sql.append("  category_id, ");
@@ -204,11 +203,11 @@ public class SearchService {
         List<SearchDto.SearchResult> results = new ArrayList<>();
         for (Object[] row : rows) {
             SearchDto.SearchResult result = SearchDto.SearchResult.builder()
-                    .id(((BigInteger) row[0]).longValue())
+                    .id(((Number) row[0]).longValue())
                     .title((String) row[1])  // highlighted_title
                     .contentPreview((String) row[2])  // highlighted_content
                     .url((String) row[3])
-                    .categoryId(row[4] != null ? ((BigInteger) row[4]).longValue() : null)
+                    .categoryId(row[4] != null ? ((Number) row[4]).longValue() : null)
                     .source((String) row[5])
                     .author((String) row[6])
                     .publishedAt(row[7] != null ? ((Timestamp) row[7]).toLocalDateTime() : null)
@@ -332,7 +331,7 @@ public class SearchService {
         for (Object[] row : rows) {
             suggestions.add(SearchDto.AutocompleteSuggestion.builder()
                     .keyword((String) row[0])
-                    .matchCount(((BigInteger) row[1]).longValue())
+                    .matchCount(((Number) row[1]).longValue())
                     .build());
         }
 

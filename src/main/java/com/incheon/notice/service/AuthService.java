@@ -104,6 +104,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName())
+                .department(request.getDepartment())
                 .role(UserRole.USER)
                 .isActive(true)
                 .isEmailVerified(false)
@@ -118,6 +119,7 @@ public class AuthService {
                 .studentId(savedUser.getStudentId())
                 .email(savedUser.getEmail())
                 .name(savedUser.getName())
+                .department(savedUser.getDepartment())
                 .role(savedUser.getRole().name())
                 .build();
     }
@@ -219,6 +221,7 @@ public class AuthService {
                         .studentId(user.getStudentId())
                         .email(user.getEmail())
                         .name(user.getName())
+                        .department(user.getDepartment())
                         .role(user.getRole().name())
                         .build())
                 .build();
@@ -295,6 +298,7 @@ public class AuthService {
                             .studentId(user.getStudentId())
                             .email(user.getEmail())
                             .name(user.getName())
+                            .department(user.getDepartment())
                             .role(user.getRole().name())
                             .build())
                     .build();
@@ -302,6 +306,65 @@ public class AuthService {
             log.error("Firebase authentication failed: {}", e.getMessage());
             throw new BusinessException("인증에 실패했습니다: " + e.getMessage());
         }
+    }
+
+    /**
+     * Firebase UID로 로그인 (테스트/개발용)
+     *
+     * Firebase UID를 직접 사용하여 로그인합니다.
+     * Firebase 콘솔에서 확인한 UID를 사용할 수 있습니다.
+     *
+     * @param request Firebase UID와 선택적 FCM Token
+     * @return 로그인 응답 (커스텀 토큰, 사용자 정보)
+     * @throws BusinessException 사용자를 찾을 수 없는 경우
+     */
+    @Transactional
+    public AuthDto.LoginResponse loginWithFirebaseUid(AuthDto.FirebaseUidLoginRequest request) {
+        String firebaseUid = request.getFirebaseUid();
+        log.info("Firebase UID 로그인 시도: uid={}", firebaseUid);
+
+        // 1. Firebase UID로 사용자 조회
+        User user = userRepository.findByFirebaseUid(firebaseUid)
+                .orElseThrow(() -> {
+                    log.warn("Firebase UID로 사용자를 찾을 수 없음: uid={}", firebaseUid);
+                    return new BusinessException("등록되지 않은 Firebase UID입니다. 먼저 회원가입을 해주세요.");
+                });
+
+        // 2. 계정 활성화 확인
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new BusinessException("비활성화된 계정입니다. 관리자에게 문의하세요.");
+        }
+
+        // 3. FCM 토큰 업데이트 (있는 경우)
+        if (request.getFcmToken() != null && !request.getFcmToken().isEmpty()) {
+            user.updateFcmToken(request.getFcmToken());
+            userRepository.save(user);
+        }
+
+        // 4. Firebase 커스텀 토큰 생성
+        String customToken = null;
+        try {
+            customToken = FirebaseAuth.getInstance().createCustomToken(firebaseUid);
+            log.info("Firebase 커스텀 토큰 생성 완료: email={}, uid={}", user.getEmail(), firebaseUid);
+        } catch (FirebaseAuthException e) {
+            log.error("Firebase 커스텀 토큰 생성 실패: uid={}, error={}", firebaseUid, e.getMessage());
+            throw new BusinessException("토큰 생성에 실패했습니다: " + e.getMessage());
+        }
+
+        // 5. 응답 생성
+        return AuthDto.LoginResponse.builder()
+                .idToken(customToken)
+                .tokenType("Bearer")
+                .expiresIn(3600L)
+                .user(AuthDto.UserResponse.builder()
+                        .id(user.getId())
+                        .studentId(user.getStudentId())
+                        .email(user.getEmail())
+                        .name(user.getName())
+                        .department(user.getDepartment())
+                        .role(user.getRole().name())
+                        .build())
+                .build();
     }
 
     /**

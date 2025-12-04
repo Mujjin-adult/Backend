@@ -41,7 +41,9 @@
       "Bash(java -version:*)",
       "Bash(lsof:*)",
       "Bash(pip3 list:*)",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "Bash(docker-compose stop:*)",
+      "Bash(__NEW_LINE__ echo \"\")"
     ],
     "deny": [],
     "ask": []

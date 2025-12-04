@@ -62,8 +62,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 인증 없이 접근 가능한 경로
                         .requestMatchers("/api/auth/**").permitAll()  // 로그인, 회원가입
-                        .requestMatchers("/api/categories/**").permitAll()  // 카테고리 조회
                         .requestMatchers(HttpMethod.GET, "/api/notices/**").permitAll()  // 공지사항 조회
+                        .requestMatchers(HttpMethod.GET, "/api/search").permitAll()  // 공지사항 검색
 
                         // Swagger UI 관련 경로 (모든 경로 포함)
                         .requestMatchers(

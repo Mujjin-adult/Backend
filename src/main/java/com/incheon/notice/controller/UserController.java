@@ -41,25 +41,55 @@ public class UserController {
     }
 
     /**
-     * 프로필 수정
-     * PUT /api/users/me
+     * 사용자 이름 수정
+     * PUT /api/users/name
      */
-    @Operation(summary = "프로필 수정", description = "사용자의 이름 등 프로필 정보를 수정합니다.")
-    @PutMapping("/me")
-    public ResponseEntity<ApiResponse<UserDto.Response>> updateProfile(
-            @Valid @RequestBody UserDto.UpdateProfileRequest request) {
+    @Operation(summary = "사용자 이름 수정", description = "사용자의 이름을 수정합니다.")
+    @PutMapping("/name")
+    public ResponseEntity<ApiResponse<UserDto.Response>> updateName(
+            @Valid @RequestBody UserDto.UpdateNameRequest request) {
 
         Long userId = getCurrentUserId();
-        UserDto.Response userInfo = userService.updateProfile(userId, request);
+        UserDto.Response userInfo = userService.updateName(userId, request);
 
-        return ResponseEntity.ok(ApiResponse.success("프로필이 수정되었습니다", userInfo));
+        return ResponseEntity.ok(ApiResponse.success("이름이 수정되었습니다", userInfo));
     }
 
     /**
-     * 사용자 설정 수정 (다크 모드, 시스템 알림)
+     * 학번 수정
+     * PUT /api/users/student-id
+     */
+    @Operation(summary = "학번 수정", description = "사용자의 학번을 수정합니다.")
+    @PutMapping("/student-id")
+    public ResponseEntity<ApiResponse<UserDto.Response>> updateStudentId(
+            @Valid @RequestBody UserDto.UpdateStudentIdRequest request) {
+
+        Long userId = getCurrentUserId();
+        UserDto.Response userInfo = userService.updateStudentId(userId, request);
+
+        return ResponseEntity.ok(ApiResponse.success("학번이 수정되었습니다", userInfo));
+    }
+
+    /**
+     * 학과 수정
+     * PUT /api/users/department
+     */
+    @Operation(summary = "학과 수정", description = "사용자의 학과를 수정합니다.")
+    @PutMapping("/department")
+    public ResponseEntity<ApiResponse<UserDto.Response>> updateDepartment(
+            @Valid @RequestBody UserDto.UpdateDepartmentRequest request) {
+
+        Long userId = getCurrentUserId();
+        UserDto.Response userInfo = userService.updateDepartment(userId, request);
+
+        return ResponseEntity.ok(ApiResponse.success("학과가 수정되었습니다", userInfo));
+    }
+
+    /**
+     * 사용자 시스템 알림 설정
      * PUT /api/users/settings
      */
-    @Operation(summary = "사용자 설정 수정", description = "다크 모드, 시스템 알림 등 사용자 설정을 변경합니다.")
+    @Operation(summary = "사용자 시스템 알림 설정", description = "시스템 알림 설정을 변경합니다.")
     @PutMapping("/settings")
     public ResponseEntity<ApiResponse<UserDto.Response>> updateSettings(
             @Valid @RequestBody UserDto.UpdateSettingsRequest request) {
@@ -67,7 +97,7 @@ public class UserController {
         Long userId = getCurrentUserId();
         UserDto.Response userInfo = userService.updateSettings(userId, request);
 
-        return ResponseEntity.ok(ApiResponse.success("설정이 변경되었습니다", userInfo));
+        return ResponseEntity.ok(ApiResponse.success("시스템 알림 설정이 변경되었습니다", userInfo));
     }
 
     /**

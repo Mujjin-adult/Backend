@@ -35,6 +35,10 @@ public class AuthDto {
         @NotBlank(message = "이름은 필수입니다")
         @Size(max = 50, message = "이름은 최대 50자입니다")
         private String name;
+
+        @NotBlank(message = "학과는 필수입니다")
+        @Size(max = 100, message = "학과는 최대 100자입니다")
+        private String department;  // 학과
     }
 
     /**
@@ -102,6 +106,7 @@ public class AuthDto {
         private String studentId;
         private String email;
         private String name;
+        private String department;  // 학과
         private String role;
     }
 
@@ -167,5 +172,20 @@ public class AuthDto {
 
         @NotBlank(message = "비밀번호 확인은 필수입니다")
         private String confirmPassword;
+    }
+
+    /**
+     * Firebase UID 로그인 요청 DTO (테스트/개발용)
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FirebaseUidLoginRequest {
+
+        @NotBlank(message = "Firebase UID는 필수입니다")
+        private String firebaseUid;
+
+        private String fcmToken;  // 선택적: FCM 토큰
     }
 }

@@ -192,6 +192,55 @@ public class AuthController {
     }
 
     /**
+     * Firebase UID로 로그인 (테스트/개발용)
+     * POST /api/auth/login/uid
+     *
+     * Firebase 콘솔에서 확인한 UID를 직접 사용하여 로그인합니다.
+     */
+    @Operation(
+        summary = "Firebase UID 로그인 (테스트용)",
+        description = """
+            Firebase UID를 직접 사용하여 로그인합니다.
+
+            **사용 방법:**
+            1. Firebase 콘솔 > Authentication > Users에서 UID 확인
+            2. 이 API에 UID 전송
+
+            **요청 예시:**
+            ```json
+            {
+              "firebaseUid": "abc123xyz...",
+              "fcmToken": "dW4f2..." (선택사항)
+            }
+            ```
+
+            **응답:**
+            ```json
+            {
+              "success": true,
+              "data": {
+                "idToken": "eyJhbGc...",  // Firebase 커스텀 토큰
+                "tokenType": "Bearer",
+                "expiresIn": 3600,
+                "user": { ... }
+              }
+            }
+            ```
+
+            **주의:**
+            - ⚠️ 테스트/개발 목적으로만 사용하세요
+            - ⚠️ 프로덕션에서는 `/api/auth/login` 또는 `/api/auth/login/email` 사용 권장
+            - 사용자가 DB에 등록되어 있어야 합니다 (회원가입 필요)
+            """
+    )
+    @PostMapping("/login/uid")
+    public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> loginWithFirebaseUid(
+            @Valid @RequestBody AuthDto.FirebaseUidLoginRequest request) {
+        AuthDto.LoginResponse response = authService.loginWithFirebaseUid(request);
+        return ResponseEntity.ok(ApiResponse.success("로그인 성공", response));
+    }
+
+    /**
      * 로그아웃
      * POST /api/auth/logout
      *

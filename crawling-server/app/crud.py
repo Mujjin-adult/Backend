@@ -10,6 +10,7 @@ from models import (
     CrawlNotice,
     HostBudget,
     Webhook,
+    DetailCategory,
     JobStatus,
     TaskStatus,
     SeedType,
@@ -172,7 +173,11 @@ def increment_task_retries(db: Session, task_id: int) -> Optional[CrawlTask]:
 
 
 def create_document(db: Session, doc_data: Dict[str, Any]) -> CrawlNotice:
-    """새로운 추출 문서 생성"""
+    """새로운 추출 문서 생성 (detail_category 자동 업데이트 포함)"""
+    # category 필드가 있으면 detail_category 테이블에 자동 추가
+    if doc_data.get("category"):
+        ensure_detail_category(db, doc_data["category"])
+
     db_doc = CrawlNotice(**doc_data)
     db.add(db_doc)
     db.commit()
@@ -182,7 +187,7 @@ def create_document(db: Session, doc_data: Dict[str, Any]) -> CrawlNotice:
 
 def bulk_create_documents(db: Session, docs_data: List[Dict[str, Any]]) -> int:
     """
-    문서 벌크 생성 (대량 삽입 최적화)
+    문서 벌크 생성 (대량 삽입 최적화, detail_category 자동 업데이트 포함)
 
     Args:
         db: 데이터베이스 세션
@@ -195,6 +200,14 @@ def bulk_create_documents(db: Session, docs_data: List[Dict[str, Any]]) -> int:
         return 0
 
     try:
+        # 모든 문서의 category 값 추출하여 detail_category 테이블에 일괄 추가
+        category_names = [
+            doc.get("category") for doc in docs_data
+            if doc.get("category")
+        ]
+        if category_names:
+            ensure_detail_categories_bulk(db, category_names)
+
         # SQLAlchemy bulk_insert_mappings 사용 (가장 빠름)
         db.bulk_insert_mappings(CrawlNotice, docs_data)
         db.commit()
@@ -521,3 +534,114 @@ def bulk_update_notice_contents(
     except Exception as e:
         db.rollback()
         raise e
+
+
+# ==================== DetailCategory CRUD ====================
+
+
+def ensure_detail_category(db: Session, category_name: str) -> Optional[DetailCategory]:
+    """
+    상세 카테고리가 존재하지 않으면 자동으로 생성
+
+    Args:
+        db: 데이터베이스 세션
+        category_name: 카테고리 이름
+
+    Returns:
+        DetailCategory 객체 (이미 존재하거나 새로 생성된)
+    """
+    if not category_name or category_name.strip() == "":
+        return None
+
+    category_name = category_name.strip()
+
+    # 기존 카테고리 조회
+    existing = db.query(DetailCategory).filter(
+        DetailCategory.name == category_name
+    ).first()
+
+    if existing:
+        return existing
+
+    # 새 카테고리 생성
+    try:
+        new_category = DetailCategory(
+            name=category_name,
+            description=f"자동 생성된 카테고리: {category_name}",
+            is_active=True
+        )
+        db.add(new_category)
+        db.commit()
+        db.refresh(new_category)
+        return new_category
+    except Exception:
+        # 동시성 문제로 이미 생성된 경우 다시 조회
+        db.rollback()
+        return db.query(DetailCategory).filter(
+            DetailCategory.name == category_name
+        ).first()
+
+
+def ensure_detail_categories_bulk(db: Session, category_names: List[str]) -> int:
+    """
+    여러 상세 카테고리를 일괄적으로 확인하고 없는 것만 생성
+
+    Args:
+        db: 데이터베이스 세션
+        category_names: 카테고리 이름 리스트
+
+    Returns:
+        새로 생성된 카테고리 수
+    """
+    if not category_names:
+        return 0
+
+    # 중복 제거 및 빈 값 필터링
+    unique_names = set(
+        name.strip() for name in category_names
+        if name and name.strip()
+    )
+
+    if not unique_names:
+        return 0
+
+    # 기존 카테고리 조회
+    existing = db.query(DetailCategory.name).filter(
+        DetailCategory.name.in_(unique_names)
+    ).all()
+    existing_names = {row[0] for row in existing}
+
+    # 새로 추가할 카테고리
+    new_names = unique_names - existing_names
+
+    if not new_names:
+        return 0
+
+    try:
+        # 새 카테고리 일괄 생성
+        new_categories = [
+            {
+                "name": name,
+                "description": f"자동 생성된 카테고리: {name}",
+                "is_active": True,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            for name in new_names
+        ]
+        db.bulk_insert_mappings(DetailCategory, new_categories)
+        db.commit()
+        return len(new_categories)
+    except Exception:
+        db.rollback()
+        return 0
+
+
+def get_all_detail_categories(db: Session) -> List[DetailCategory]:
+    """모든 상세 카테고리 조회"""
+    return db.query(DetailCategory).order_by(DetailCategory.name).all()
+
+
+def get_detail_category_by_name(db: Session, name: str) -> Optional[DetailCategory]:
+    """이름으로 상세 카테고리 조회"""
+    return db.query(DetailCategory).filter(DetailCategory.name == name).first()

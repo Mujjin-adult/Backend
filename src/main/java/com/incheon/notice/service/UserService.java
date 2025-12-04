@@ -35,41 +35,71 @@ public class UserService {
     }
 
     /**
-     * 프로필 수정
+     * 사용자 이름 수정
      */
     @Transactional
-    public UserDto.Response updateProfile(Long userId, UserDto.UpdateProfileRequest request) {
-        log.debug("프로필 수정: userId={}", userId);
+    public UserDto.Response updateName(Long userId, UserDto.UpdateNameRequest request) {
+        log.debug("이름 수정: userId={}", userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
 
-        // 이메일 중복 체크 (자신의 이메일이 아닌 경우)
-        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-            if (userRepository.existsByEmail(request.getEmail())) {
-                throw new RuntimeException("이미 사용 중인 이메일입니다");
-            }
-        }
-
-        // 프로필 업데이트
-        user.updateInfo(request.getName(), request.getEmail() != null ? request.getEmail() : user.getEmail());
+        user.updateName(request.getName());
 
         return toResponse(user);
     }
 
     /**
-     * 사용자 설정 수정 (다크 모드, 시스템 알림)
+     * 학번 수정
      */
     @Transactional
-    public UserDto.Response updateSettings(Long userId, UserDto.UpdateSettingsRequest request) {
-        log.debug("사용자 설정 수정: userId={}, darkMode={}, notification={}",
-                userId, request.getDarkMode(), request.getSystemNotificationEnabled());
+    public UserDto.Response updateStudentId(Long userId, UserDto.UpdateStudentIdRequest request) {
+        log.debug("학번 수정: userId={}", userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
 
-        // 설정 업데이트
-        user.updateSettings(request.getDarkMode(), request.getSystemNotificationEnabled());
+        // 학번 중복 체크 (자신의 학번이 아닌 경우)
+        if (request.getStudentId() != null && !request.getStudentId().equals(user.getStudentId())) {
+            if (userRepository.existsByStudentId(request.getStudentId())) {
+                throw new RuntimeException("이미 사용 중인 학번입니다");
+            }
+        }
+
+        user.updateStudentId(request.getStudentId());
+
+        return toResponse(user);
+    }
+
+    /**
+     * 학과 수정
+     */
+    @Transactional
+    public UserDto.Response updateDepartment(Long userId, UserDto.UpdateDepartmentRequest request) {
+        log.debug("학과 수정: userId={}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+
+        user.updateDepartment(request.getDepartment());
+
+        return toResponse(user);
+    }
+
+    /**
+     * 사용자 시스템 알림 설정 수정
+     */
+    @Transactional
+    public UserDto.Response updateSettings(Long userId, UserDto.UpdateSettingsRequest request) {
+        log.debug("시스템 알림 설정 수정: userId={}, notification={}",
+                userId, request.getSystemNotificationEnabled());
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+
+        if (request.getSystemNotificationEnabled() != null) {
+            user.updateSystemNotification(request.getSystemNotificationEnabled());
+        }
 
         return toResponse(user);
     }
@@ -143,9 +173,9 @@ public class UserService {
                 .studentId(user.getStudentId())
                 .email(user.getEmail())
                 .name(user.getName())
+                .department(user.getDepartment())
                 .role(user.getRole().name())
                 .isActive(user.getIsActive())
-                .darkMode(user.getDarkMode())
                 .systemNotificationEnabled(user.getSystemNotificationEnabled())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())

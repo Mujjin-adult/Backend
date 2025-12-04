@@ -41,4 +41,10 @@ public interface UserPreferenceRepository extends JpaRepository<UserPreference, 
      * 사용자와 카테고리로 설정 조회
      */
     Optional<UserPreference> findByUserIdAndCategoryId(Long userId, Long categoryId);
+
+    /**
+     * 사용자가 구독한 카테고리 ID 목록 조회 (알림 활성화된 것만)
+     */
+    @Query("SELECT up.category.id FROM UserPreference up WHERE up.user.id = :userId AND up.notificationEnabled = true")
+    List<Long> findSubscribedCategoryIdsByUserId(@Param("userId") Long userId);
 }

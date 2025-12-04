@@ -53,9 +53,8 @@ public class User extends BaseEntity {
     @Builder.Default
     private Boolean isActive = true;  // 활성 상태
 
-    @Column(nullable = false)
-    @Builder.Default
-    private Boolean darkMode = false;  // 다크 모드 설정
+    @Column(length = 100)
+    private String department;  // 학과
 
     @Column(nullable = false)
     @Builder.Default
@@ -98,10 +97,10 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 다크 모드 설정 변경
+     * 학과 설정
      */
-    public void updateDarkMode(Boolean darkMode) {
-        this.darkMode = darkMode;
+    public void updateDepartment(String department) {
+        this.department = department;
     }
 
     /**
@@ -112,15 +111,10 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 사용자 설정 일괄 업데이트
+     * 이름 수정
      */
-    public void updateSettings(Boolean darkMode, Boolean systemNotificationEnabled) {
-        if (darkMode != null) {
-            this.darkMode = darkMode;
-        }
-        if (systemNotificationEnabled != null) {
-            this.systemNotificationEnabled = systemNotificationEnabled;
-        }
+    public void updateName(String name) {
+        this.name = name;
     }
 
     /**
