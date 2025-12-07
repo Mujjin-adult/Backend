@@ -165,6 +165,7 @@ public class SearchService {
         sql.append("  COALESCE(author, writer) AS author, ");
         sql.append("  published_at, ");
         sql.append("  COALESCE(view_count, 0) AS view_count, ");
+        sql.append("  hits, ");
         sql.append("  is_important, ");
         sql.append("  ts_rank(search_vector, to_tsquery('simple', :tsquery)) AS relevance_score ");
         sql.append("FROM crawl_notice ");
@@ -212,8 +213,9 @@ public class SearchService {
                     .author((String) row[6])
                     .publishedAt(row[7] != null ? ((Timestamp) row[7]).toLocalDateTime() : null)
                     .viewCount(((Number) row[8]).intValue())
-                    .isImportant((Boolean) row[9])
-                    .relevanceScore(row[10] != null ? ((Number) row[10]).doubleValue() : 0.0)
+                    .hits((String) row[9])
+                    .isImportant((Boolean) row[10])
+                    .relevanceScore(row[11] != null ? ((Number) row[11]).doubleValue() : 0.0)
                     .bookmarked(false)
                     .build();
 

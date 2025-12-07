@@ -117,6 +117,11 @@ public class SearchDto {
         private Integer viewCount;
 
         /**
+         * 조회수 문자열 (크롤러 원본)
+         */
+        private String hits;
+
+        /**
          * 중요 공지 여부
          */
         private Boolean isImportant;
@@ -146,6 +151,7 @@ public class SearchDto {
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
+                    .hits(notice.getHits())
                     .isImportant(notice.getIsImportant())
                     .bookmarked(false)
                     .build();

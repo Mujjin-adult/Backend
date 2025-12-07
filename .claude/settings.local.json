@@ -43,7 +43,10 @@
       "Bash(pip3 list:*)",
       "Bash(pip3 install:*)",
       "Bash(docker-compose stop:*)",
-      "Bash(__NEW_LINE__ echo \"\")"
+      "Bash(__NEW_LINE__ echo \"\")",
+      "Bash(gradle build:*)",
+      "Bash(gradle -version:*)",
+      "Bash(kill:*)"
     ],
     "deny": [],
     "ask": []

@@ -31,6 +31,7 @@ public class NoticeDto {
         private String author;
         private LocalDateTime publishedAt;
         private Integer viewCount;
+        private String hits;  // 조회수 문자열 (크롤러 원본)
         private Boolean isImportant;
         private Boolean isPinned;
         private Boolean bookmarked;  // 현재 사용자가 북마크했는지 여부
@@ -48,6 +49,7 @@ public class NoticeDto {
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
+                    .hits(notice.getHits())
                     .isImportant(notice.getIsImportant())
                     .isPinned(notice.getIsPinned())
                     .bookmarked(false)  // 기본값, 나중에 설정
@@ -88,6 +90,7 @@ public class NoticeDto {
         private String author;
         private LocalDateTime publishedAt;
         private Integer viewCount;
+        private String hits;  // 조회수 문자열 (크롤러 원본)
         private Boolean isImportant;
         private Boolean isPinned;
         private String attachments;
@@ -110,6 +113,7 @@ public class NoticeDto {
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
+                    .hits(notice.getHits())
                     .isImportant(notice.getIsImportant())
                     .isPinned(notice.getIsPinned())
                     .attachments(notice.getAttachments())
