@@ -80,12 +80,12 @@ public class NoticeService {
         return noticesPage.map(notice -> {
             NoticeDto.Response dto = NoticeDto.Response.from(notice);
 
-            // 카테고리 정보 설정
-            if (notice.getCategoryId() != null) {
-                categoryRepository.findById(notice.getCategoryId()).ifPresent(category -> {
-                    dto.setCategoryName(category.getName());
-                    dto.setCategoryCode(category.getCode());
-                });
+            // 카테고리 정보 설정 (categoryId 또는 source 기반)
+            Category category = findCategoryForNotice(notice);
+            if (category != null) {
+                dto.setCategoryName(category.getName());
+                dto.setCategoryCode(category.getCode());
+                dto.setSource(category.getName());  // source도 카테고리 name으로 설정
             }
 
             // 북마크 상태 설정
@@ -119,11 +119,12 @@ public class NoticeService {
         crawlNoticeRepository.save(notice);
 
         // DTO로 변환
+        Category category = findCategoryForNotice(notice);
         NoticeDto.DetailResponse response;
 
-        if (notice.getCategoryId() != null) {
-            Category category = categoryRepository.findById(notice.getCategoryId()).orElse(null);
+        if (category != null) {
             response = NoticeDto.DetailResponse.from(notice, category);
+            response.setSource(category.getName());  // source도 카테고리 name으로 설정
         } else {
             response = NoticeDto.DetailResponse.from(notice);
         }
@@ -176,12 +177,12 @@ public class NoticeService {
                 .map(related -> {
                     NoticeDto.Response dto = NoticeDto.Response.from(related);
 
-                    // 카테고리 정보 설정
-                    if (related.getCategoryId() != null) {
-                        categoryRepository.findById(related.getCategoryId()).ifPresent(category -> {
-                            dto.setCategoryName(category.getName());
-                            dto.setCategoryCode(category.getCode());
-                        });
+                    // 카테고리 정보 설정 (categoryId 또는 source 기반)
+                    Category category = findCategoryForNotice(related);
+                    if (category != null) {
+                        dto.setCategoryName(category.getName());
+                        dto.setCategoryCode(category.getCode());
+                        dto.setSource(category.getName());  // source도 카테고리 name으로 설정
                     }
 
                     return dto;
@@ -206,12 +207,12 @@ public class NoticeService {
                 .map(notice -> {
                     NoticeDto.Response dto = NoticeDto.Response.from(notice);
 
-                    // 카테고리 정보 설정
-                    if (notice.getCategoryId() != null) {
-                        categoryRepository.findById(notice.getCategoryId()).ifPresent(category -> {
-                            dto.setCategoryName(category.getName());
-                            dto.setCategoryCode(category.getCode());
-                        });
+                    // 카테고리 정보 설정 (categoryId 또는 source 기반)
+                    Category category = findCategoryForNotice(notice);
+                    if (category != null) {
+                        dto.setCategoryName(category.getName());
+                        dto.setCategoryCode(category.getCode());
+                        dto.setSource(category.getName());  // source도 카테고리 name으로 설정
                     }
 
                     // 북마크 상태 설정
@@ -250,5 +251,27 @@ public class NoticeService {
                         .and(Sort.by(Sort.Direction.DESC, "createdAt"));
             }
         };
+    }
+
+    /**
+     * 공지사항에 해당하는 카테고리 조회
+     * 1. categoryId가 있으면 해당 ID로 조회
+     * 2. categoryId가 없고 source가 있으면 source를 code로 사용하여 조회
+     *
+     * @param notice 공지사항
+     * @return 카테고리 (없으면 null)
+     */
+    private Category findCategoryForNotice(CrawlNotice notice) {
+        // 1. categoryId로 조회
+        if (notice.getCategoryId() != null) {
+            return categoryRepository.findById(notice.getCategoryId()).orElse(null);
+        }
+
+        // 2. source를 code로 사용하여 조회
+        if (notice.getSource() != null && !notice.getSource().isEmpty()) {
+            return categoryRepository.findByCode(notice.getSource()).orElse(null);
+        }
+
+        return null;
     }
 }
