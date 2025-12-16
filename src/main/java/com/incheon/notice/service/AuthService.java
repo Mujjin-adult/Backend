@@ -1,6 +1,5 @@
 package com.incheon.notice.service;
 
-import com.google.firebase.auth.ActionCodeSettings;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
@@ -13,7 +12,6 @@ import com.incheon.notice.repository.UserRepository;
 import com.incheon.notice.security.FirebaseTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,9 +30,6 @@ public class AuthService {
     private final FirebaseTokenProvider firebaseTokenProvider;
     private final EmailService emailService;
 
-    @Value("${app.frontend.url:http://localhost:3000}")
-    private String frontendUrl;
-
     /**
      * 회원가입 (Firebase 통합)
      *
@@ -44,10 +39,9 @@ public class AuthService {
      * 1. 이메일/학번 중복 체크
      * 2. Firebase Authentication에 사용자 생성
      * 3. DB에 사용자 저장 (Firebase UID 포함)
-     * 4. 이메일 인증 링크 발송
-     * 5. 성공 응답 (클라이언트는 이메일 인증 후 로그인)
+     * 4. 성공 응답
      *
-     * ⚠️ 중요:
+     * 중요:
      * - idToken은 클라이언트에서 로그인 후 발급받아야 합니다
      * - fcmToken도 클라이언트 디바이스에서 발급받아야 합니다
      * - 회원가입 후 반드시 login() API를 호출하여 토큰을 등록하세요
@@ -358,130 +352,4 @@ public class AuthService {
         return masked + "@" + domain;
     }
 
-    /**
-     * 이메일 인증 링크 생성 및 발송 (Firebase)
-     *
-     * 서버에서 Firebase Admin SDK를 사용하여 이메일 인증 링크를 생성하고 발송합니다.
-     *
-     * ⚠️ 권장: 클라이언트에서 Firebase SDK의 sendEmailVerification()을 사용하는 것이 더 간단합니다.
-     *
-     * 이 메서드는 다음과 같은 경우에 사용하세요:
-     * - 커스텀 이메일 템플릿이 필요한 경우
-     * - 서버에서 이메일 발송을 완전히 제어해야 하는 경우
-     *
-     * @param email 이메일 주소
-     * @return 성공 메시지
-     * @throws BusinessException 이메일 발송 실패 시
-     */
-    @Transactional(readOnly = true)
-    public String sendEmailVerification(String email) {
-        try {
-            // 1. Firebase에서 사용자 조회
-            var firebaseUser = FirebaseAuth.getInstance().getUserByEmail(email);
-
-            // 2. 이미 인증된 경우
-            if (firebaseUser.isEmailVerified()) {
-                log.info("이미 인증된 이메일: email={}", email);
-                return "이미 인증된 이메일입니다";
-            }
-
-            // 3. ActionCodeSettings 생성 (인증 후 리다이렉트 URL 설정)
-            ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
-                    .setUrl(frontendUrl + "/email-verified") // 인증 완료 후 이동할 URL
-                    .setHandleCodeInApp(false) // 이메일 링크를 앱에서 처리하지 않음
-                    .build();
-
-            // 4. 이메일 인증 링크 생성
-            String verificationLink = FirebaseAuth.getInstance()
-                    .generateEmailVerificationLink(email, actionCodeSettings);
-
-            // 5. 이메일 발송 (EmailService 사용)
-            emailService.sendFirebaseVerificationEmail(email, verificationLink);
-
-            log.info("이메일 인증 링크 발송 완료: email={}", email);
-            return "이메일 인증 링크가 발송되었습니다";
-
-        } catch (FirebaseAuthException e) {
-            log.error("이메일 인증 링크 생성 실패: email={}, error={}", email, e.getMessage());
-            throw new BusinessException("이메일 인증 링크 생성에 실패했습니다: " + e.getMessage());
-        } catch (Exception e) {
-            log.error("이메일 발송 실패: email={}, error={}", email, e.getMessage());
-            throw new BusinessException("이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
-        }
-    }
-
-    /**
-     * 이메일 인증 메일 재발송 (Firebase)
-     *
-     * @param email 이메일 주소
-     * @return 성공 메시지
-     * @throws BusinessException 이메일 발송 실패 시
-     */
-    @Transactional(readOnly = true)
-    public String resendEmailVerification(String email) {
-        // 사용자가 DB에 존재하는지 확인
-        userRepository.findByEmail(email)
-                .orElseThrow(() -> new BusinessException("등록되지 않은 이메일입니다"));
-
-        return sendEmailVerification(email);
-    }
-
-    /**
-     * 비밀번호 재설정 이메일 발송 (Firebase)
-     *
-     * Firebase Admin SDK를 사용하여 비밀번호 재설정 링크를 생성하고 이메일로 발송합니다.
-     *
-     * 플로우:
-     * 1. 사용자가 이메일 입력
-     * 2. Firebase에서 비밀번호 재설정 링크 생성
-     * 3. 이메일로 재설정 링크 발송
-     * 4. 사용자가 링크 클릭 → Firebase 호스팅 페이지에서 새 비밀번호 입력
-     * 5. Firebase에서 자동으로 비밀번호 업데이트
-     *
-     * @param email 비밀번호를 재설정할 이메일 주소
-     * @return 성공 메시지
-     * @throws BusinessException 이메일 발송 실패 시
-     */
-    @Transactional(readOnly = true)
-    public String sendPasswordResetEmail(String email) {
-        try {
-            // 1. 사용자가 DB에 존재하는지 확인
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new BusinessException("등록되지 않은 이메일입니다"));
-
-            // 2. Firebase에서 사용자 조회
-            try {
-                FirebaseAuth.getInstance().getUserByEmail(email);
-            } catch (FirebaseAuthException e) {
-                if (e.getAuthErrorCode().name().equals("USER_NOT_FOUND")) {
-                    log.warn("Firebase에 사용자 없음. DB에만 존재: email={}", email);
-                    throw new BusinessException("Firebase 인증을 사용하는 계정이 아닙니다");
-                }
-                throw e;
-            }
-
-            // 3. ActionCodeSettings 생성 (비밀번호 재설정 후 리다이렉트 URL)
-            ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
-                    .setUrl(frontendUrl + "/reset-password-complete")
-                    .setHandleCodeInApp(false)
-                    .build();
-
-            // 4. 비밀번호 재설정 링크 생성
-            String resetLink = FirebaseAuth.getInstance()
-                    .generatePasswordResetLink(email, actionCodeSettings);
-
-            // 5. 이메일 발송
-            emailService.sendFirebasePasswordResetEmail(email, user.getName(), resetLink);
-
-            log.info("비밀번호 재설정 이메일 발송 완료: email={}", email);
-            return "비밀번호 재설정 이메일이 발송되었습니다. 이메일을 확인해주세요.";
-
-        } catch (FirebaseAuthException e) {
-            log.error("비밀번호 재설정 링크 생성 실패: email={}, error={}", email, e.getMessage());
-            throw new BusinessException("비밀번호 재설정 링크 생성에 실패했습니다: " + e.getMessage());
-        } catch (Exception e) {
-            log.error("비밀번호 재설정 이메일 발송 실패: email={}, error={}", email, e.getMessage());
-            throw new BusinessException("이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
-        }
-    }
 }

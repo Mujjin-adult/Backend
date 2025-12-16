@@ -3,9 +3,11 @@ package com.incheon.notice.service;
 import com.incheon.notice.dto.BookmarkDto;
 import com.incheon.notice.dto.NoticeDto;
 import com.incheon.notice.entity.Bookmark;
+import com.incheon.notice.entity.Category;
 import com.incheon.notice.entity.CrawlNotice;
 import com.incheon.notice.entity.User;
 import com.incheon.notice.repository.BookmarkRepository;
+import com.incheon.notice.repository.CategoryRepository;
 import com.incheon.notice.repository.CrawlNoticeRepository;
 import com.incheon.notice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class BookmarkService {
     private final BookmarkRepository bookmarkRepository;
     private final CrawlNoticeRepository crawlNoticeRepository;
     private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
 
     /**
      * 북마크 생성
@@ -148,21 +151,56 @@ public class BookmarkService {
     private BookmarkDto.Response toResponse(Bookmark bookmark) {
         CrawlNotice notice = bookmark.getCrawlNotice();
 
+        // 카테고리 정보 조회 (categoryId 또는 source 기반)
+        Category category = findCategoryForNotice(notice);
+
+        NoticeDto.Response noticeResponse = NoticeDto.Response.builder()
+                .id(notice.getId())
+                .title(notice.getTitle())
+                .url(notice.getUrl())
+                .categoryId(notice.getCategoryId())
+                .detailCategory(notice.getCategory())  // 세부 카테고리
+                .author(notice.getAuthor())
+                .publishedAt(notice.getPublishedAt())
+                .viewCount(notice.getViewCount())
+                .isImportant(notice.getIsImportant())
+                .isPinned(notice.getIsPinned())
+                .bookmarked(true)
+                .build();
+
+        // 카테고리 정보 설정
+        if (category != null) {
+            noticeResponse.setCategoryName(category.getName());
+            noticeResponse.setCategoryCode(category.getCode());
+            noticeResponse.setSource(category.getName());
+        } else {
+            noticeResponse.setSource(notice.getSource());
+        }
+
         return BookmarkDto.Response.builder()
                 .id(bookmark.getId())
-                .notice(NoticeDto.Response.builder()
-                        .id(notice.getId())
-                        .title(notice.getTitle())
-                        .url(notice.getUrl())
-                        .author(notice.getAuthor())
-                        .publishedAt(notice.getPublishedAt())
-                        .viewCount(notice.getViewCount())
-                        .isImportant(notice.getIsImportant())
-                        .isPinned(notice.getIsPinned())
-                        .bookmarked(true)
-                        .build())
+                .notice(noticeResponse)
                 .memo(bookmark.getMemo())
                 .createdAt(bookmark.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * 공지사항에 해당하는 카테고리 조회
+     * 1. categoryId가 있으면 해당 ID로 조회
+     * 2. categoryId가 없고 source가 있으면 source를 code로 사용하여 조회
+     */
+    private Category findCategoryForNotice(CrawlNotice notice) {
+        // 1. categoryId로 조회
+        if (notice.getCategoryId() != null) {
+            return categoryRepository.findById(notice.getCategoryId()).orElse(null);
+        }
+
+        // 2. source를 code로 사용하여 조회
+        if (notice.getSource() != null && !notice.getSource().isEmpty()) {
+            return categoryRepository.findByCode(notice.getSource()).orElse(null);
+        }
+
+        return null;
     }
 }
