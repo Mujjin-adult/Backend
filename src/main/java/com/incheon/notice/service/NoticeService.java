@@ -17,7 +17,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -31,6 +31,7 @@ public class NoticeService {
     private final CrawlNoticeRepository crawlNoticeRepository;
     private final BookmarkRepository bookmarkRepository;
     private final CategoryRepository categoryRepository;
+    private final CategoryService categoryService;
     private final UserDetailCategoryPreferenceRepository userDetailCategoryPreferenceRepository;
 
     /**
@@ -80,24 +81,37 @@ public class NoticeService {
         // 공지사항 조회
         Page<CrawlNotice> noticesPage = crawlNoticeRepository.findAll(spec, pageableWithSort);
 
-        // DTO로 변환
+        // 배치 조회를 위한 ID 목록 추출
+        List<CrawlNotice> notices = noticesPage.getContent();
+        List<Long> noticeIds = notices.stream()
+                .map(CrawlNotice::getId)
+                .toList();
+
+        // 카테고리 정보 배치 조회 (캐싱 적용됨)
+        Map<Long, Category> categoryMap = categoryService.getCategoryMap();
+
+        // 북마크 정보 배치 조회 (로그인 사용자만)
+        Set<Long> bookmarkedNoticeIds = Collections.emptySet();
+        if (userEmail != null && !noticeIds.isEmpty()) {
+            bookmarkedNoticeIds = bookmarkRepository.findBookmarkedNoticeIdsByUserEmail(userEmail, noticeIds);
+        }
+
+        // DTO로 변환 (배치 조회 결과 활용)
+        final Set<Long> finalBookmarkedIds = bookmarkedNoticeIds;
         return noticesPage.map(notice -> {
             NoticeDto.Response dto = NoticeDto.Response.from(notice);
 
-            // 카테고리 정보 설정
+            // 카테고리 정보 설정 (Map에서 O(1) 조회)
             if (notice.getCategoryId() != null) {
-                categoryRepository.findById(notice.getCategoryId()).ifPresent(category -> {
+                Category category = categoryMap.get(notice.getCategoryId());
+                if (category != null) {
                     dto.setCategoryName(category.getName());
                     dto.setCategoryCode(category.getCode());
-                });
+                }
             }
 
-            // 북마크 상태 설정
-            if (userEmail != null) {
-                boolean isBookmarked = bookmarkRepository
-                        .existsByUser_EmailAndCrawlNotice_Id(userEmail, notice.getId());
-                dto.setBookmarked(isBookmarked);
-            }
+            // 북마크 상태 설정 (Set에서 O(1) 조회)
+            dto.setBookmarked(finalBookmarkedIds.contains(notice.getId()));
 
             return dto;
         });
@@ -155,17 +169,21 @@ public class NoticeService {
 
         Page<Bookmark> bookmarks = bookmarkRepository.findByUserIdWithNotice(userId, pageable);
 
+        // 카테고리 정보 배치 조회 (캐싱 적용됨)
+        Map<Long, Category> categoryMap = categoryService.getCategoryMap();
+
         return bookmarks.map(bookmark -> {
             CrawlNotice notice = bookmark.getCrawlNotice();
             NoticeDto.Response dto = NoticeDto.Response.from(notice);
             dto.setBookmarked(true);
 
-            // 카테고리 정보 설정
+            // 카테고리 정보 설정 (Map에서 O(1) 조회)
             if (notice.getCategoryId() != null) {
-                categoryRepository.findById(notice.getCategoryId()).ifPresent(category -> {
+                Category category = categoryMap.get(notice.getCategoryId());
+                if (category != null) {
                     dto.setCategoryName(category.getName());
                     dto.setCategoryCode(category.getCode());
-                });
+                }
             }
 
             return dto;
@@ -198,19 +216,34 @@ public class NoticeService {
         // 해당 카테고리의 공지사항 조회
         Page<CrawlNotice> notices = crawlNoticeRepository.findByCategoryIn(subscribedCategories, pageable);
 
+        // 배치 조회를 위한 ID 목록 추출
+        List<Long> noticeIds = notices.getContent().stream()
+                .map(CrawlNotice::getId)
+                .toList();
+
+        // 카테고리 정보 배치 조회 (캐싱 적용됨)
+        Map<Long, Category> categoryMap = categoryService.getCategoryMap();
+
+        // 북마크 정보 배치 조회
+        Set<Long> bookmarkedNoticeIds = Collections.emptySet();
+        if (!noticeIds.isEmpty()) {
+            bookmarkedNoticeIds = bookmarkRepository.findBookmarkedNoticeIdsByUserId(userId, noticeIds);
+        }
+
+        final Set<Long> finalBookmarkedIds = bookmarkedNoticeIds;
         return notices.map(notice -> {
             NoticeDto.Response dto = NoticeDto.Response.from(notice);
 
-            // 북마크 상태 설정
-            boolean isBookmarked = bookmarkRepository.existsByUserIdAndCrawlNoticeId(userId, notice.getId());
-            dto.setBookmarked(isBookmarked);
+            // 북마크 상태 설정 (Set에서 O(1) 조회)
+            dto.setBookmarked(finalBookmarkedIds.contains(notice.getId()));
 
-            // 카테고리 정보 설정
+            // 카테고리 정보 설정 (Map에서 O(1) 조회)
             if (notice.getCategoryId() != null) {
-                categoryRepository.findById(notice.getCategoryId()).ifPresent(category -> {
+                Category category = categoryMap.get(notice.getCategoryId());
+                if (category != null) {
                     dto.setCategoryName(category.getName());
                     dto.setCategoryCode(category.getCode());
-                });
+                }
             }
 
             return dto;
