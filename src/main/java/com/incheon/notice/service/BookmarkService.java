@@ -10,8 +10,6 @@ import com.incheon.notice.repository.CrawlNoticeRepository;
 import com.incheon.notice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,65 +47,15 @@ public class BookmarkService {
             throw new RuntimeException("이미 북마크한 공지사항입니다");
         }
 
-        // 북마크 생성
+        // 북마크 생성 (memo 없이)
         Bookmark bookmark = Bookmark.builder()
                 .user(user)
                 .crawlNotice(notice)
-                .memo(request.getMemo())
                 .build();
 
         Bookmark savedBookmark = bookmarkRepository.save(bookmark);
 
         return toResponse(savedBookmark);
-    }
-
-    /**
-     * 사용자 북마크 목록 조회
-     */
-    public Page<BookmarkDto.Response> getMyBookmarks(Long userId, Pageable pageable) {
-        log.debug("내 북마크 목록 조회: userId={}", userId);
-
-        Page<Bookmark> bookmarkPage = bookmarkRepository.findByUserIdWithNotice(userId, pageable);
-
-        return bookmarkPage.map(this::toResponse);
-    }
-
-    /**
-     * 북마크 상세 조회
-     */
-    public BookmarkDto.Response getBookmark(Long userId, Long bookmarkId) {
-        log.debug("북마크 조회: userId={}, bookmarkId={}", userId, bookmarkId);
-
-        Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
-                .orElseThrow(() -> new RuntimeException("북마크를 찾을 수 없습니다: " + bookmarkId));
-
-        // 자신의 북마크인지 확인
-        if (!bookmark.getUser().getId().equals(userId)) {
-            throw new RuntimeException("권한이 없습니다");
-        }
-
-        return toResponse(bookmark);
-    }
-
-    /**
-     * 북마크 메모 수정
-     */
-    @Transactional
-    public BookmarkDto.Response updateBookmarkMemo(Long userId, Long bookmarkId, BookmarkDto.UpdateRequest request) {
-        log.debug("북마크 메모 수정: userId={}, bookmarkId={}", userId, bookmarkId);
-
-        Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
-                .orElseThrow(() -> new RuntimeException("북마크를 찾을 수 없습니다: " + bookmarkId));
-
-        // 자신의 북마크인지 확인
-        if (!bookmark.getUser().getId().equals(userId)) {
-            throw new RuntimeException("권한이 없습니다");
-        }
-
-        // 메모 업데이트
-        bookmark.updateMemo(request.getMemo());
-
-        return toResponse(bookmark);
     }
 
     /**
@@ -129,17 +77,10 @@ public class BookmarkService {
     }
 
     /**
-     * 특정 공지사항 북마크 여부 확인
+     * 특정 공지사항 북마크 여부 확인 (내부용)
      */
     public boolean isBookmarked(Long userId, Long noticeId) {
         return bookmarkRepository.existsByUserIdAndCrawlNoticeId(userId, noticeId);
-    }
-
-    /**
-     * 사용자의 북마크 개수
-     */
-    public long getBookmarkCount(Long userId) {
-        return bookmarkRepository.countByUserId(userId);
     }
 
     /**
@@ -161,7 +102,6 @@ public class BookmarkService {
                         .isPinned(notice.getIsPinned())
                         .bookmarked(true)
                         .build())
-                .memo(bookmark.getMemo())
                 .createdAt(bookmark.getCreatedAt())
                 .build();
     }

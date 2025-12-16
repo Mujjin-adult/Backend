@@ -55,11 +55,11 @@ public class User extends BaseEntity {
 
     @Column(nullable = false)
     @Builder.Default
-    private Boolean darkMode = false;  // 다크 모드 설정
-
-    @Column(nullable = false)
-    @Builder.Default
     private Boolean systemNotificationEnabled = true;  // 시스템 알림 허용/미허용
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;  // 소속 학과
 
     @Column(nullable = false)
     @Builder.Default
@@ -98,13 +98,6 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 다크 모드 설정 변경
-     */
-    public void updateDarkMode(Boolean darkMode) {
-        this.darkMode = darkMode;
-    }
-
-    /**
      * 시스템 알림 설정 변경
      */
     public void updateSystemNotification(Boolean enabled) {
@@ -112,15 +105,26 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 사용자 설정 일괄 업데이트
+     * 사용자 시스템 알림 설정 업데이트
      */
-    public void updateSettings(Boolean darkMode, Boolean systemNotificationEnabled) {
-        if (darkMode != null) {
-            this.darkMode = darkMode;
-        }
+    public void updateSettings(Boolean systemNotificationEnabled) {
         if (systemNotificationEnabled != null) {
             this.systemNotificationEnabled = systemNotificationEnabled;
         }
+    }
+
+    /**
+     * 이름 변경
+     */
+    public void updateName(String name) {
+        this.name = name;
+    }
+
+    /**
+     * 학과 변경
+     */
+    public void updateDepartment(Department department) {
+        this.department = department;
     }
 
     /**

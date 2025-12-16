@@ -1,7 +1,10 @@
 package com.incheon.notice.service;
 
+import com.incheon.notice.dto.DepartmentDto;
 import com.incheon.notice.dto.UserDto;
+import com.incheon.notice.entity.Department;
 import com.incheon.notice.entity.User;
+import com.incheon.notice.repository.DepartmentRepository;
 import com.incheon.notice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
 
     /**
@@ -35,41 +39,72 @@ public class UserService {
     }
 
     /**
-     * 프로필 수정
+     * 사용자 시스템 알림 설정 수정
      */
     @Transactional
-    public UserDto.Response updateProfile(Long userId, UserDto.UpdateProfileRequest request) {
-        log.debug("프로필 수정: userId={}", userId);
+    public UserDto.Response updateSettings(Long userId, UserDto.UpdateSettingsRequest request) {
+        log.debug("사용자 시스템 알림 설정 수정: userId={}, notification={}",
+                userId, request.getSystemNotificationEnabled());
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
 
-        // 이메일 중복 체크 (자신의 이메일이 아닌 경우)
-        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-            if (userRepository.existsByEmail(request.getEmail())) {
-                throw new RuntimeException("이미 사용 중인 이메일입니다");
-            }
-        }
-
-        // 프로필 업데이트
-        user.updateInfo(request.getName(), request.getEmail() != null ? request.getEmail() : user.getEmail());
+        // 시스템 알림 설정 업데이트
+        user.updateSettings(request.getSystemNotificationEnabled());
 
         return toResponse(user);
     }
 
     /**
-     * 사용자 설정 수정 (다크 모드, 시스템 알림)
+     * 사용자 이름 수정
      */
     @Transactional
-    public UserDto.Response updateSettings(Long userId, UserDto.UpdateSettingsRequest request) {
-        log.debug("사용자 설정 수정: userId={}, darkMode={}, notification={}",
-                userId, request.getDarkMode(), request.getSystemNotificationEnabled());
+    public UserDto.Response updateName(Long userId, UserDto.UpdateNameRequest request) {
+        log.debug("사용자 이름 수정: userId={}, name={}", userId, request.getName());
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
 
-        // 설정 업데이트
-        user.updateSettings(request.getDarkMode(), request.getSystemNotificationEnabled());
+        user.updateName(request.getName());
+
+        return toResponse(user);
+    }
+
+    /**
+     * 사용자 학번 수정
+     */
+    @Transactional
+    public UserDto.Response updateStudentId(Long userId, UserDto.UpdateStudentIdRequest request) {
+        log.debug("사용자 학번 수정: userId={}, studentId={}", userId, request.getStudentId());
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+
+        // 학번 중복 체크 (자신의 학번이 아닌 경우)
+        if (!request.getStudentId().equals(user.getStudentId())
+                && userRepository.existsByStudentId(request.getStudentId())) {
+            throw new RuntimeException("이미 등록된 학번입니다");
+        }
+
+        user.updateStudentId(request.getStudentId());
+
+        return toResponse(user);
+    }
+
+    /**
+     * 사용자 학과 수정
+     */
+    @Transactional
+    public UserDto.Response updateDepartment(Long userId, UserDto.UpdateDepartmentRequest request) {
+        log.debug("사용자 학과 수정: userId={}, departmentId={}", userId, request.getDepartmentId());
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+
+        Department department = departmentRepository.findById(request.getDepartmentId())
+                .orElseThrow(() -> new RuntimeException("학과를 찾을 수 없습니다: " + request.getDepartmentId()));
+
+        user.updateDepartment(department);
 
         return toResponse(user);
     }
@@ -129,15 +164,17 @@ public class UserService {
 
         // 계정 비활성화 (실제 삭제 대신 비활성화)
         user.deactivate();
-
-        // 완전 삭제를 원하는 경우 아래 주석 해제
-        // userRepository.delete(user);
     }
 
     /**
      * User 엔티티를 응답 DTO로 변환
      */
     private UserDto.Response toResponse(User user) {
+        DepartmentDto.Response departmentResponse = null;
+        if (user.getDepartment() != null) {
+            departmentResponse = DepartmentDto.Response.from(user.getDepartment());
+        }
+
         return UserDto.Response.builder()
                 .id(user.getId())
                 .studentId(user.getStudentId())
@@ -145,8 +182,8 @@ public class UserService {
                 .name(user.getName())
                 .role(user.getRole().name())
                 .isActive(user.getIsActive())
-                .darkMode(user.getDarkMode())
                 .systemNotificationEnabled(user.getSystemNotificationEnabled())
+                .department(departmentResponse)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

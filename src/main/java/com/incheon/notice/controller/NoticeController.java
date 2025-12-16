@@ -16,7 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import com.incheon.notice.security.CustomUserDetailsService;
 
 /**
  * 공지사항 API Controller
@@ -95,44 +95,53 @@ public class NoticeController {
     }
 
     /**
-     * 관련 공지사항 조회
-     * GET /api/notices/{noticeId}/related?limit=5
+     * 북마크한 공지사항 목록 조회
+     * GET /api/notices/bookmarked
      */
     @Operation(
-            summary = "관련 공지사항 조회",
-            description = "특정 공지사항과 같은 카테고리의 다른 공지사항을 조회합니다."
+            summary = "북마크한 공지사항 조회",
+            description = "사용자가 북마크한 공지사항 목록을 페이징하여 조회합니다."
     )
-    @GetMapping("/{noticeId}/related")
-    public ResponseEntity<ApiResponse<List<NoticeDto.Response>>> getRelatedNotices(
-            @Parameter(description = "기준 공지사항 ID")
-            @PathVariable Long noticeId,
+    @GetMapping("/bookmarked")
+    public ResponseEntity<ApiResponse<Page<NoticeDto.Response>>> getBookmarkedNotices(
+            @Parameter(description = "페이지 번호 (0부터 시작)")
+            @RequestParam(defaultValue = "0") int page,
 
-            @Parameter(description = "조회할 관련 공지사항 개수")
-            @RequestParam(defaultValue = "5") int limit
+            @Parameter(description = "페이지 크기")
+            @RequestParam(defaultValue = "20") int size
     ) {
-        log.info("GET /api/notices/{}/related - limit: {}", noticeId, limit);
+        log.info("GET /api/notices/bookmarked - page: {}, size: {}", page, size);
 
-        List<NoticeDto.Response> relatedNotices = noticeService.getRelatedNotices(noticeId, limit);
+        Long userId = getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+        Page<NoticeDto.Response> bookmarkedNotices = noticeService.getBookmarkedNotices(userId, pageable);
 
-        return ResponseEntity.ok(ApiResponse.success("관련 공지사항 조회 성공", relatedNotices));
+        return ResponseEntity.ok(ApiResponse.success("북마크한 공지사항 조회 성공", bookmarkedNotices));
     }
 
     /**
-     * 중요 공지사항 목록 조회
-     * GET /api/notices/important
+     * 구독한 카테고리의 공지사항 목록 조회
+     * GET /api/notices/subscribed
      */
     @Operation(
-            summary = "중요 공지사항 목록 조회",
-            description = "중요 표시된 공지사항 목록을 조회합니다."
+            summary = "구독 카테고리 공지사항 조회",
+            description = "사용자가 구독한 상세 카테고리의 공지사항 목록을 페이징하여 조회합니다."
     )
-    @GetMapping("/important")
-    public ResponseEntity<ApiResponse<List<NoticeDto.Response>>> getImportantNotices() {
-        log.info("GET /api/notices/important");
+    @GetMapping("/subscribed")
+    public ResponseEntity<ApiResponse<Page<NoticeDto.Response>>> getSubscribedNotices(
+            @Parameter(description = "페이지 번호 (0부터 시작)")
+            @RequestParam(defaultValue = "0") int page,
 
-        String userEmail = getCurrentUserEmail();
-        List<NoticeDto.Response> importantNotices = noticeService.getImportantNotices(userEmail);
+            @Parameter(description = "페이지 크기")
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        log.info("GET /api/notices/subscribed - page: {}, size: {}", page, size);
 
-        return ResponseEntity.ok(ApiResponse.success("중요 공지사항 조회 성공", importantNotices));
+        Long userId = getCurrentUserId();
+        Pageable pageable = PageRequest.of(page, size);
+        Page<NoticeDto.Response> subscribedNotices = noticeService.getSubscribedNotices(userId, pageable);
+
+        return ResponseEntity.ok(ApiResponse.success("구독 카테고리 공지사항 조회 성공", subscribedNotices));
     }
 
     /**
@@ -149,5 +158,17 @@ public class NoticeController {
             log.warn("Failed to get current user email: {}", e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * SecurityContext에서 현재 인증된 사용자 ID 가져오기
+     */
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new RuntimeException("인증이 필요합니다");
+        }
+
+        return ((CustomUserDetailsService.CustomUserDetails) authentication.getPrincipal()).getUserId();
     }
 }

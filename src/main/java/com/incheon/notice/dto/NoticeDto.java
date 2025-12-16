@@ -27,10 +27,13 @@ public class NoticeDto {
         private Long categoryId;
         private String categoryName;
         private String categoryCode;
+        private String detailCategory;  // crawl_notice.category 값
         private String source;
         private String author;
+        private String date;  // crawl_notice.date 값 (원본 날짜 문자열)
         private LocalDateTime publishedAt;
         private Integer viewCount;
+        private String hits;  // crawl_notice.hits 값 (원본 조회수 문자열)
         private Boolean isImportant;
         private Boolean isPinned;
         private Boolean bookmarked;  // 현재 사용자가 북마크했는지 여부
@@ -44,10 +47,13 @@ public class NoticeDto {
                     .title(notice.getTitle())
                     .url(notice.getUrl())
                     .categoryId(notice.getCategoryId())
+                    .detailCategory(notice.getCategory())
                     .source(notice.getSource())
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
+                    .date(notice.getDate())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
+                    .hits(notice.getHits())
                     .isImportant(notice.getIsImportant())
                     .isPinned(notice.getIsPinned())
                     .bookmarked(false)  // 기본값, 나중에 설정
@@ -84,10 +90,13 @@ public class NoticeDto {
         private String externalId;
         private Long categoryId;
         private CategoryDto.Response category;
+        private String detailCategory;  // crawl_notice.category 값
         private String source;
         private String author;
+        private String date;  // crawl_notice.date 값 (원본 날짜 문자열)
         private LocalDateTime publishedAt;
         private Integer viewCount;
+        private String hits;  // crawl_notice.hits 값 (원본 조회수 문자열)
         private Boolean isImportant;
         private Boolean isPinned;
         private String attachments;
@@ -106,10 +115,13 @@ public class NoticeDto {
                     .url(notice.getUrl())
                     .externalId(notice.getExternalId())
                     .categoryId(notice.getCategoryId())
+                    .detailCategory(notice.getCategory())
                     .source(notice.getSource())
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
+                    .date(notice.getDate())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
+                    .hits(notice.getHits())
                     .isImportant(notice.getIsImportant())
                     .isPinned(notice.getIsPinned())
                     .attachments(notice.getAttachments())
