@@ -11,7 +11,7 @@ import logging
 from config import get_redis_url, get_crawler_config
 from database import get_db_context
 from models import CrawlNotice
-from crud import create_task, update_task_status, increment_task_retries, create_document, bulk_create_documents, get_job_by_name, get_document_by_url
+from crud import create_task, update_task_status, increment_task_retries, create_document, bulk_create_documents, get_job_by_name, get_document_by_url, sync_detail_categories
 from robots_parser import RobotsManager
 from rate_limiter import get_rate_limiter
 from url_utils import get_duplicate_checker, get_url_normalizer
@@ -236,6 +236,16 @@ def college_crawl_task(self, job_name: str):
                                 except Exception as doc_error:
                                     logger.error(f"Failed to save document individually: {doc_error}")
                                     continue
+
+        # detail_category 테이블 동기화 (새 카테고리 자동 추가)
+        detail_category_result = {"added_count": 0, "updated_count": 0}
+        if saved_items > 0:
+            try:
+                with get_db_context() as db:
+                    detail_category_result = sync_detail_categories(db)
+                    logger.info(f"detail_category 동기화 완료: 추가={detail_category_result.get('added_count', 0)}, 갱신={detail_category_result.get('updated_count', 0)}")
+            except Exception as e:
+                logger.warning(f"detail_category 동기화 실패 (무시됨): {e}")
 
         # 성능 로깅
         duration = time.time() - start_time

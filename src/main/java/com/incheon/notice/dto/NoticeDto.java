@@ -28,6 +28,7 @@ public class NoticeDto {
         private String categoryName;
         private String categoryCode;
         private String source;
+        private String detailCategory;  // 세부 카테고리 (crawl_notice.category)
         private String author;
         private LocalDateTime publishedAt;
         private Integer viewCount;
@@ -45,6 +46,7 @@ public class NoticeDto {
                     .url(notice.getUrl())
                     .categoryId(notice.getCategoryId())
                     .source(notice.getSource())
+                    .detailCategory(notice.getCategory())  // 세부 카테고리
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
@@ -85,6 +87,7 @@ public class NoticeDto {
         private Long categoryId;
         private CategoryDto.Response category;
         private String source;
+        private String detailCategory;  // 세부 카테고리 (crawl_notice.category)
         private String author;
         private LocalDateTime publishedAt;
         private Integer viewCount;
@@ -107,6 +110,7 @@ public class NoticeDto {
                     .externalId(notice.getExternalId())
                     .categoryId(notice.getCategoryId())
                     .source(notice.getSource())
+                    .detailCategory(notice.getCategory())  // 세부 카테고리
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
