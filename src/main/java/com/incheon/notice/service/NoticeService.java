@@ -1,12 +1,15 @@
 package com.incheon.notice.service;
 
 import com.incheon.notice.dto.NoticeDto;
+import com.incheon.notice.entity.Bookmark;
 import com.incheon.notice.entity.Category;
 import com.incheon.notice.entity.CrawlNotice;
+import com.incheon.notice.entity.UserDetailCategoryPreference;
 import com.incheon.notice.exception.NoticeNotFoundException;
 import com.incheon.notice.repository.BookmarkRepository;
 import com.incheon.notice.repository.CategoryRepository;
 import com.incheon.notice.repository.CrawlNoticeRepository;
+import com.incheon.notice.repository.UserDetailCategoryPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
@@ -28,6 +31,7 @@ public class NoticeService {
     private final CrawlNoticeRepository crawlNoticeRepository;
     private final BookmarkRepository bookmarkRepository;
     private final CategoryRepository categoryRepository;
+    private final UserDetailCategoryPreferenceRepository userDetailCategoryPreferenceRepository;
 
     /**
      * 공지사항 목록 조회 (페이징, 필터링)
@@ -139,91 +143,78 @@ public class NoticeService {
     }
 
     /**
-     * 관련 공지사항 조회 (같은 카테고리, 최신순)
+     * 북마크한 공지사항 조회
      *
-     * @param noticeId 기준 공지사항 ID
-     * @param limit    조회 개수
-     * @return 관련 공지사항 목록
+     * @param userId   사용자 ID
+     * @param pageable 페이징 정보
+     * @return 북마크한 공지사항 목록
      */
     @Transactional(readOnly = true)
-    public List<NoticeDto.Response> getRelatedNotices(Long noticeId, int limit) {
-        log.info("Fetching related notices for notice: {}, limit: {}", noticeId, limit);
+    public Page<NoticeDto.Response> getBookmarkedNotices(Long userId, Pageable pageable) {
+        log.info("Fetching bookmarked notices for user: {}", userId);
 
-        // 기준 공지사항 조회
-        CrawlNotice notice = crawlNoticeRepository.findById(noticeId)
-                .orElseThrow(() -> new NoticeNotFoundException(noticeId));
+        Page<Bookmark> bookmarks = bookmarkRepository.findByUserIdWithNotice(userId, pageable);
 
-        // 같은 카테고리의 다른 공지사항 조회
-        if (notice.getCategoryId() == null) {
-            log.warn("Notice {} has no category, returning empty related notices", noticeId);
-            return List.of();
-        }
+        return bookmarks.map(bookmark -> {
+            CrawlNotice notice = bookmark.getCrawlNotice();
+            NoticeDto.Response dto = NoticeDto.Response.from(notice);
+            dto.setBookmarked(true);
 
-        Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "publishedAt"));
+            // 카테고리 정보 설정
+            if (notice.getCategoryId() != null) {
+                categoryRepository.findById(notice.getCategoryId()).ifPresent(category -> {
+                    dto.setCategoryName(category.getName());
+                    dto.setCategoryCode(category.getCode());
+                });
+            }
 
-        List<CrawlNotice> relatedNotices = crawlNoticeRepository
-                .findAll(
-                        (root, query, cb) -> cb.and(
-                                cb.equal(root.get("categoryId"), notice.getCategoryId()),
-                                cb.notEqual(root.get("id"), noticeId)
-                        ),
-                        pageable
-                )
-                .getContent();
-
-        // DTO로 변환
-        return relatedNotices.stream()
-                .map(related -> {
-                    NoticeDto.Response dto = NoticeDto.Response.from(related);
-
-                    // 카테고리 정보 설정
-                    if (related.getCategoryId() != null) {
-                        categoryRepository.findById(related.getCategoryId()).ifPresent(category -> {
-                            dto.setCategoryName(category.getName());
-                            dto.setCategoryCode(category.getCode());
-                        });
-                    }
-
-                    return dto;
-                })
-                .collect(Collectors.toList());
+            return dto;
+        });
     }
 
     /**
-     * 중요 공지사항 목록 조회
+     * 구독한 카테고리의 공지사항 조회
      *
-     * @param userEmail 현재 사용자 이메일
-     * @return 중요 공지사항 목록
+     * @param userId   사용자 ID
+     * @param pageable 페이징 정보
+     * @return 구독한 카테고리의 공지사항 목록
      */
     @Transactional(readOnly = true)
-    public List<NoticeDto.Response> getImportantNotices(String userEmail) {
-        log.info("Fetching important notices");
+    public Page<NoticeDto.Response> getSubscribedNotices(Long userId, Pageable pageable) {
+        log.info("Fetching subscribed notices for user: {}", userId);
 
-        List<CrawlNotice> importantNotices = crawlNoticeRepository
-                .findByIsImportantTrueOrderByPublishedAtDesc();
-
-        return importantNotices.stream()
-                .map(notice -> {
-                    NoticeDto.Response dto = NoticeDto.Response.from(notice);
-
-                    // 카테고리 정보 설정
-                    if (notice.getCategoryId() != null) {
-                        categoryRepository.findById(notice.getCategoryId()).ifPresent(category -> {
-                            dto.setCategoryName(category.getName());
-                            dto.setCategoryCode(category.getCode());
-                        });
-                    }
-
-                    // 북마크 상태 설정
-                    if (userEmail != null) {
-                        boolean isBookmarked = bookmarkRepository
-                                .existsByUser_EmailAndCrawlNotice_Id(userEmail, notice.getId());
-                        dto.setBookmarked(isBookmarked);
-                    }
-
-                    return dto;
-                })
+        // 사용자가 구독한 상세 카테고리 목록 조회
+        List<String> subscribedCategories = userDetailCategoryPreferenceRepository
+                .findByUserIdAndEnabledTrue(userId)
+                .stream()
+                .map(pref -> pref.getDetailCategory().getName())
                 .collect(Collectors.toList());
+
+        if (subscribedCategories.isEmpty()) {
+            log.info("User {} has no subscribed categories", userId);
+            return Page.empty(pageable);
+        }
+
+        // 해당 카테고리의 공지사항 조회
+        Page<CrawlNotice> notices = crawlNoticeRepository.findByCategoryIn(subscribedCategories, pageable);
+
+        return notices.map(notice -> {
+            NoticeDto.Response dto = NoticeDto.Response.from(notice);
+
+            // 북마크 상태 설정
+            boolean isBookmarked = bookmarkRepository.existsByUserIdAndCrawlNoticeId(userId, notice.getId());
+            dto.setBookmarked(isBookmarked);
+
+            // 카테고리 정보 설정
+            if (notice.getCategoryId() != null) {
+                categoryRepository.findById(notice.getCategoryId()).ifPresent(category -> {
+                    dto.setCategoryName(category.getName());
+                    dto.setCategoryCode(category.getCode());
+                });
+            }
+
+            return dto;
+        });
     }
 
     /**

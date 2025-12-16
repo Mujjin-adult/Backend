@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,9 +18,9 @@ import java.util.List;
 
 /**
  * 사용자 알림 설정 API Controller
- * 카테고리 구독 및 알림 관리
+ * 상세 카테고리 구독 및 알림 관리
  */
-@Tag(name = "알림 설정", description = "카테고리 구독 및 알림 관리 API")
+@Tag(name = "알림 설정", description = "상세 카테고리 구독 및 알림 관리 API")
 @Slf4j
 @RestController
 @RequestMapping("/api/preferences")
@@ -31,32 +30,39 @@ public class UserPreferenceController {
     private final UserPreferenceService userPreferenceService;
 
     /**
-     * 카테고리 구독
-     * POST /api/preferences/categories
+     * 상세 카테고리 목록 조회 (구독 상태 포함)
+     * GET /api/preferences/detail-categories
      */
-    @Operation(summary = "카테고리 구독", description = "특정 카테고리를 구독하여 해당 카테고리의 공지사항 알림을 받을 수 있습니다.")
-    @PostMapping("/categories")
-    public ResponseEntity<ApiResponse<UserPreferenceDto.Response>> subscribeCategory(
-            @Valid @RequestBody UserPreferenceDto.SubscribeRequest request) {
-
+    @Operation(
+            summary = "상세 카테고리 목록 조회",
+            description = "전체 상세 카테고리 목록을 사용자의 구독 상태와 함께 조회합니다."
+    )
+    @GetMapping("/detail-categories")
+    public ResponseEntity<ApiResponse<List<UserPreferenceDto.DetailCategoryResponse>>> getDetailCategories() {
         Long userId = getCurrentUserId();
-        UserPreferenceDto.Response preference = userPreferenceService.subscribe(userId, request);
+        List<UserPreferenceDto.DetailCategoryResponse> categories =
+                userPreferenceService.getDetailCategoriesWithSubscriptionStatus(userId);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("카테고리 구독이 완료되었습니다", preference));
+        return ResponseEntity.ok(ApiResponse.success("상세 카테고리 목록 조회 성공", categories));
     }
 
     /**
-     * 내 구독 카테고리 목록 조회
-     * GET /api/preferences/categories
+     * 알림 상세 카테고리 구독 설정
+     * PATCH /api/preferences/categories
      */
-    @Operation(summary = "구독 카테고리 조회", description = "내가 구독한 모든 카테고리 목록을 조회합니다.")
-    @GetMapping("/categories")
-    public ResponseEntity<ApiResponse<List<UserPreferenceDto.Response>>> getMyPreferences() {
-        Long userId = getCurrentUserId();
-        List<UserPreferenceDto.Response> preferences = userPreferenceService.getMyPreferences(userId);
+    @Operation(
+            summary = "알림 상세 카테고리 구독 설정",
+            description = "상세 카테고리의 구독 상태를 일괄 업데이트합니다. 구독 활성화/비활성화를 설정할 수 있습니다."
+    )
+    @PatchMapping("/categories")
+    public ResponseEntity<ApiResponse<List<UserPreferenceDto.DetailCategoryResponse>>> updateDetailCategorySubscriptions(
+            @Valid @RequestBody UserPreferenceDto.DetailCategorySubscribeRequest request) {
 
-        return ResponseEntity.ok(ApiResponse.success("구독 카테고리 목록 조회 성공", preferences));
+        Long userId = getCurrentUserId();
+        List<UserPreferenceDto.DetailCategoryResponse> categories =
+                userPreferenceService.updateDetailCategorySubscriptions(userId, request);
+
+        return ResponseEntity.ok(ApiResponse.success("상세 카테고리 구독 설정이 업데이트되었습니다", categories));
     }
 
     /**
@@ -70,48 +76,6 @@ public class UserPreferenceController {
         List<UserPreferenceDto.Response> preferences = userPreferenceService.getActivePreferences(userId);
 
         return ResponseEntity.ok(ApiResponse.success("활성화된 구독 카테고리 조회 성공", preferences));
-    }
-
-    /**
-     * 특정 카테고리 구독 여부 확인
-     * GET /api/preferences/categories/{categoryId}/subscribed
-     */
-    @Operation(summary = "구독 여부 확인", description = "특정 카테고리를 구독하고 있는지 확인합니다.")
-    @GetMapping("/categories/{categoryId}/subscribed")
-    public ResponseEntity<ApiResponse<Boolean>> isSubscribed(@PathVariable Long categoryId) {
-        Long userId = getCurrentUserId();
-        boolean isSubscribed = userPreferenceService.isSubscribed(userId, categoryId);
-
-        return ResponseEntity.ok(ApiResponse.success(isSubscribed));
-    }
-
-    /**
-     * 알림 설정 변경 (활성화/비활성화)
-     * PUT /api/preferences/categories/{categoryId}/notification
-     */
-    @Operation(summary = "알림 설정 변경", description = "구독한 카테고리의 알림을 활성화하거나 비활성화합니다.")
-    @PutMapping("/categories/{categoryId}/notification")
-    public ResponseEntity<ApiResponse<UserPreferenceDto.Response>> updateNotification(
-            @PathVariable Long categoryId,
-            @Valid @RequestBody UserPreferenceDto.UpdateNotificationRequest request) {
-
-        Long userId = getCurrentUserId();
-        UserPreferenceDto.Response preference = userPreferenceService.updateNotification(userId, categoryId, request);
-
-        return ResponseEntity.ok(ApiResponse.success("알림 설정이 변경되었습니다", preference));
-    }
-
-    /**
-     * 카테고리 구독 취소
-     * DELETE /api/preferences/categories/{categoryId}
-     */
-    @Operation(summary = "구독 취소", description = "카테고리 구독을 취소합니다.")
-    @DeleteMapping("/categories/{categoryId}")
-    public ResponseEntity<ApiResponse<Void>> unsubscribeCategory(@PathVariable Long categoryId) {
-        Long userId = getCurrentUserId();
-        userPreferenceService.unsubscribe(userId, categoryId);
-
-        return ResponseEntity.ok(ApiResponse.success("카테고리 구독이 취소되었습니다", null));
     }
 
     /**
