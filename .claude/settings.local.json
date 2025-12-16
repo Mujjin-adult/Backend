@@ -41,7 +41,9 @@
       "Bash(java -version:*)",
       "Bash(lsof:*)",
       "Bash(pip3 list:*)",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(git -C /Users/chosunghoon/Desktop/Incheon_univ_noti_app log --all --oneline --source --remotes -- *detail*)"
     ],
     "deny": [],
     "ask": []

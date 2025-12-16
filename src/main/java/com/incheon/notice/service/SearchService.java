@@ -163,6 +163,7 @@ public class SearchService {
         sql.append("  url, ");
         sql.append("  category_id, ");
         sql.append("  source, ");
+        sql.append("  category AS detail_category, ");
         sql.append("  COALESCE(author, writer) AS author, ");
         sql.append("  published_at, ");
         sql.append("  COALESCE(view_count, 0) AS view_count, ");
@@ -210,11 +211,12 @@ public class SearchService {
                     .url((String) row[3])
                     .categoryId(row[4] != null ? ((BigInteger) row[4]).longValue() : null)
                     .source((String) row[5])
-                    .author((String) row[6])
-                    .publishedAt(row[7] != null ? ((Timestamp) row[7]).toLocalDateTime() : null)
-                    .viewCount(((Number) row[8]).intValue())
-                    .isImportant((Boolean) row[9])
-                    .relevanceScore(row[10] != null ? ((Number) row[10]).doubleValue() : 0.0)
+                    .detailCategory((String) row[6])  // 세부 카테고리
+                    .author((String) row[7])
+                    .publishedAt(row[8] != null ? ((Timestamp) row[8]).toLocalDateTime() : null)
+                    .viewCount(((Number) row[9]).intValue())
+                    .isImportant((Boolean) row[10])
+                    .relevanceScore(row[11] != null ? ((Number) row[11]).doubleValue() : 0.0)
                     .bookmarked(false)
                     .build();
 
@@ -225,29 +227,54 @@ public class SearchService {
     }
 
     /**
-     * 카테고리 정보 채우기
+     * 카테고리 정보 채우기 (categoryId 또는 source 기반)
      */
     private void enrichWithCategoryInfo(List<SearchDto.SearchResult> results) {
-        // categoryId가 있는 결과만 추출
+        // 1. categoryId가 있는 결과 처리
         List<Long> categoryIds = results.stream()
                 .map(SearchDto.SearchResult::getCategoryId)
                 .filter(id -> id != null)
                 .distinct()
                 .collect(Collectors.toList());
 
-        if (categoryIds.isEmpty()) {
-            return;
+        // categoryId -> Category 매핑
+        Map<Long, Category> categoryByIdMap = categoryIds.isEmpty()
+                ? Map.of()
+                : categoryRepository.findAllById(categoryIds)
+                        .stream()
+                        .collect(Collectors.toMap(Category::getId, c -> c));
+
+        // 2. source(code)가 있는 결과 처리 (categoryId가 없는 경우)
+        List<String> sourceCodes = results.stream()
+                .filter(r -> r.getCategoryId() == null && r.getSource() != null && !r.getSource().isEmpty())
+                .map(SearchDto.SearchResult::getSource)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // source(code) -> Category 매핑
+        Map<String, Category> categoryByCodeMap = new java.util.HashMap<>();
+        for (String code : sourceCodes) {
+            categoryRepository.findByCode(code).ifPresent(cat -> categoryByCodeMap.put(code, cat));
         }
 
-        // 카테고리 정보 일괄 조회
-        Map<Long, String> categoryMap = categoryRepository.findAllById(categoryIds)
-                .stream()
-                .collect(Collectors.toMap(Category::getId, Category::getName));
-
-        // 결과에 카테고리 이름 설정
+        // 3. 결과에 카테고리 정보 설정
         results.forEach(result -> {
+            Category category = null;
+
+            // categoryId로 조회
             if (result.getCategoryId() != null) {
-                result.setCategoryName(categoryMap.get(result.getCategoryId()));
+                category = categoryByIdMap.get(result.getCategoryId());
+            }
+            // source(code)로 조회
+            else if (result.getSource() != null && !result.getSource().isEmpty()) {
+                category = categoryByCodeMap.get(result.getSource());
+            }
+
+            // 카테고리 정보 설정
+            if (category != null) {
+                result.setCategoryName(category.getName());
+                result.setCategoryCode(category.getCode());
+                result.setSource(category.getName());  // source도 카테고리 name으로 설정
             }
         });
     }

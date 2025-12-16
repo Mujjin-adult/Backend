@@ -97,9 +97,19 @@ public class SearchDto {
         private String categoryName;
 
         /**
-         * 출처 (소스)
+         * 카테고리 코드 (있는 경우)
+         */
+        private String categoryCode;
+
+        /**
+         * 출처 (소스) - categories 테이블의 name 값
          */
         private String source;
+
+        /**
+         * 세부 카테고리 (crawl_notice.category)
+         */
+        private String detailCategory;
 
         /**
          * 작성자
@@ -143,6 +153,7 @@ public class SearchDto {
                     .url(notice.getUrl())
                     .categoryId(notice.getCategoryId())
                     .source(notice.getSource())
+                    .detailCategory(notice.getCategory())  // 세부 카테고리
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
