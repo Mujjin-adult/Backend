@@ -137,11 +137,12 @@ public class NoticeService {
         crawlNoticeRepository.save(notice);
 
         // DTO로 변환
+        Category category = findCategoryForNotice(notice);
         NoticeDto.DetailResponse response;
 
-        if (notice.getCategoryId() != null) {
-            Category category = categoryRepository.findById(notice.getCategoryId()).orElse(null);
+        if (category != null) {
             response = NoticeDto.DetailResponse.from(notice, category);
+            response.setSource(category.getName());  // source도 카테고리 name으로 설정
         } else {
             response = NoticeDto.DetailResponse.from(notice);
         }
@@ -274,5 +275,27 @@ public class NoticeService {
                         .and(Sort.by(Sort.Direction.DESC, "createdAt"));
             }
         };
+    }
+
+    /**
+     * 공지사항에 해당하는 카테고리 조회
+     * 1. categoryId가 있으면 해당 ID로 조회
+     * 2. categoryId가 없고 source가 있으면 source를 code로 사용하여 조회
+     *
+     * @param notice 공지사항
+     * @return 카테고리 (없으면 null)
+     */
+    private Category findCategoryForNotice(CrawlNotice notice) {
+        // 1. categoryId로 조회
+        if (notice.getCategoryId() != null) {
+            return categoryRepository.findById(notice.getCategoryId()).orElse(null);
+        }
+
+        // 2. source를 code로 사용하여 조회
+        if (notice.getSource() != null && !notice.getSource().isEmpty()) {
+            return categoryRepository.findByCode(notice.getSource()).orElse(null);
+        }
+
+        return null;
     }
 }
