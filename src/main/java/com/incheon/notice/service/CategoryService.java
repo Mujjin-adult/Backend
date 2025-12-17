@@ -6,10 +6,13 @@ import com.incheon.notice.repository.CategoryRepository;
 import com.incheon.notice.repository.CrawlNoticeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +38,35 @@ public class CategoryService {
         return categories.stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 카테고리 Map 조회 (캐싱 적용)
+     * N+1 쿼리 문제 해결을 위한 배치 조회용 메서드
+     *
+     * @return Map<카테고리ID, Category>
+     */
+    @Cacheable(value = "categoryMap", key = "'all'")
+    public Map<Long, Category> getCategoryMap() {
+        log.info("카테고리 Map 조회 (캐시 미스 - DB 조회)");
+
+        return categoryRepository.findAll().stream()
+                .collect(Collectors.toMap(Category::getId, Function.identity()));
+    }
+
+    /**
+     * 특정 카테고리 ID 목록에 해당하는 카테고리 Map 조회
+     *
+     * @param categoryIds 카테고리 ID 목록
+     * @return Map<카테고리ID, Category>
+     */
+    public Map<Long, Category> getCategoryMapByIds(List<Long> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return categoryRepository.findAllById(categoryIds).stream()
+                .collect(Collectors.toMap(Category::getId, Function.identity()));
     }
 
     /**

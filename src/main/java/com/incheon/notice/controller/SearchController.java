@@ -95,59 +95,6 @@ public class SearchController {
     }
 
     /**
-     * 검색어 자동완성
-     * GET /api/search/autocomplete?prefix=장학&limit=10
-     */
-    @Operation(
-        summary = "검색어 자동완성",
-        description = """
-            입력 중인 검색어에 대한 자동완성 제안을 제공합니다.
-
-            - 최소 2글자 이상 입력 필요
-            - 접두사 매칭 (prefix matching)
-            - 매칭된 공지사항 수와 함께 반환
-            """
-    )
-    @GetMapping("/autocomplete")
-    public ResponseEntity<ApiResponse<List<SearchDto.AutocompleteSuggestion>>> autocomplete(
-            @Parameter(description = "검색어 접두사 (최소 2글자)", example = "장학")
-            @RequestParam String prefix,
-
-            @Parameter(description = "결과 개수 제한")
-            @RequestParam(defaultValue = "10") int limit
-    ) {
-        log.info("Autocomplete request: prefix='{}', limit={}", prefix, limit);
-
-        List<SearchDto.AutocompleteSuggestion> suggestions = searchService.autocomplete(prefix, limit);
-
-        return ResponseEntity.ok(ApiResponse.success("자동완성 조회 성공", suggestions));
-    }
-
-    /**
-     * 인기 검색어 조회
-     * GET /api/search/popular?limit=10
-     */
-    @Operation(
-        summary = "인기 검색어 조회",
-        description = """
-            최근 24시간 기준 인기 검색어 TOP N을 조회합니다.
-
-            **Note:** 현재는 구현되지 않았습니다. search_log 테이블 추가 후 활성화됩니다.
-            """
-    )
-    @GetMapping("/popular")
-    public ResponseEntity<ApiResponse<List<SearchDto.PopularKeyword>>> getPopularKeywords(
-            @Parameter(description = "조회할 인기 검색어 개수")
-            @RequestParam(defaultValue = "10") int limit
-    ) {
-        log.info("Popular keywords request: limit={}", limit);
-
-        List<SearchDto.PopularKeyword> keywords = searchService.getPopularKeywords(limit);
-
-        return ResponseEntity.ok(ApiResponse.success("인기 검색어 조회 성공", keywords));
-    }
-
-    /**
      * 최근 검색어 저장
      * POST /api/search/recent
      */
@@ -187,19 +134,6 @@ public class SearchController {
         recentSearchService.deleteRecentSearch(userId, id);
 
         return ResponseEntity.ok(ApiResponse.success("최근 검색어가 삭제되었습니다"));
-    }
-
-    /**
-     * 모든 최근 검색어 삭제
-     * DELETE /api/search/recent
-     */
-    @Operation(summary = "모든 최근 검색어 삭제", description = "사용자의 모든 최근 검색어를 삭제합니다.")
-    @DeleteMapping("/recent")
-    public ResponseEntity<ApiResponse<String>> deleteAllRecentSearches() {
-        Long userId = getCurrentUserId();
-        recentSearchService.deleteAllRecentSearches(userId);
-
-        return ResponseEntity.ok(ApiResponse.success("모든 최근 검색어가 삭제되었습니다"));
     }
 
     /**

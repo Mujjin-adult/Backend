@@ -123,4 +123,15 @@ public interface CrawlNoticeRepository extends JpaRepository<CrawlNotice, Long>,
      * 소스별 공지사항 개수 조회
      */
     long countBySource(String source);
+
+    /**
+     * 카테고리 목록에 해당하는 공지사항 조회 (구독 기능용)
+     */
+    @Query("SELECT cn FROM CrawlNotice cn WHERE cn.category IN :categories ORDER BY cn.publishedAt DESC")
+    Page<CrawlNotice> findByCategoryIn(@Param("categories") List<String> categories, Pageable pageable);
+
+    /**
+     * 특정 카테고리의 공지사항 조회
+     */
+    Page<CrawlNotice> findByCategoryOrderByPublishedAtDesc(String category, Pageable pageable);
 }

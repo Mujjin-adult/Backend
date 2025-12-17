@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -139,7 +138,7 @@ public class SearchService {
             query.setParameter("categoryId", categoryId);
         }
 
-        return ((BigInteger) query.getSingleResult()).longValue();
+        return ((Number) query.getSingleResult()).longValue();
     }
 
     /**
@@ -158,15 +157,18 @@ public class SearchService {
         sql.append("  id, ");
         sql.append("  ts_headline('simple', title, to_tsquery('simple', :tsquery), ");
         sql.append("    'StartSel=<mark>, StopSel=</mark>, MaxWords=10, MinWords=5') AS highlighted_title, ");
-        sql.append("  ts_headline('simple', COALESCE(content, ''), to_tsquery('simple', :tsquery'), ");
+        sql.append("  ts_headline('simple', COALESCE(content, ''), to_tsquery('simple', :tsquery), ");
         sql.append("    'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15, MaxFragments=1') AS highlighted_content, ");
         sql.append("  url, ");
         sql.append("  category_id, ");
+        sql.append("  category, ");
         sql.append("  source, ");
         sql.append("  category AS detail_category, ");
         sql.append("  COALESCE(author, writer) AS author, ");
         sql.append("  published_at, ");
         sql.append("  COALESCE(view_count, 0) AS view_count, ");
+        sql.append("  hits, ");
+        sql.append("  date, ");
         sql.append("  is_important, ");
         sql.append("  ts_rank(search_vector, to_tsquery('simple', :tsquery)) AS relevance_score ");
         sql.append("FROM crawl_notice ");
@@ -202,21 +204,24 @@ public class SearchService {
         List<Object[]> rows = query.getResultList();
 
         // Object[] -> SearchResult 변환
+        // 컬럼 순서: id, highlighted_title, highlighted_content, url, category_id, category, source, author, published_at, view_count, hits, date, is_important, relevance_score
         List<SearchDto.SearchResult> results = new ArrayList<>();
         for (Object[] row : rows) {
             SearchDto.SearchResult result = SearchDto.SearchResult.builder()
-                    .id(((BigInteger) row[0]).longValue())
+                    .id(((Number) row[0]).longValue())
                     .title((String) row[1])  // highlighted_title
                     .contentPreview((String) row[2])  // highlighted_content
                     .url((String) row[3])
-                    .categoryId(row[4] != null ? ((BigInteger) row[4]).longValue() : null)
-                    .source((String) row[5])
-                    .detailCategory((String) row[6])  // 세부 카테고리
+                    .categoryId(row[4] != null ? ((Number) row[4]).longValue() : null)
+                    .detailCategory((String) row[5])  // category
+                    .source((String) row[6])
                     .author((String) row[7])
                     .publishedAt(row[8] != null ? ((Timestamp) row[8]).toLocalDateTime() : null)
                     .viewCount(((Number) row[9]).intValue())
-                    .isImportant((Boolean) row[10])
-                    .relevanceScore(row[11] != null ? ((Number) row[11]).doubleValue() : 0.0)
+                    .hits((String) row[10])  // hits
+                    .date((String) row[11])  // date
+                    .isImportant((Boolean) row[12])
+                    .relevanceScore(row[13] != null ? ((Number) row[13]).doubleValue() : 0.0)
                     .bookmarked(false)
                     .build();
 
@@ -359,7 +364,7 @@ public class SearchService {
         for (Object[] row : rows) {
             suggestions.add(SearchDto.AutocompleteSuggestion.builder()
                     .keyword((String) row[0])
-                    .matchCount(((BigInteger) row[1]).longValue())
+                    .matchCount(((Number) row[1]).longValue())
                     .build());
         }
 

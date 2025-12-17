@@ -3,9 +3,13 @@ package com.incheon.notice.service;
 import com.incheon.notice.dto.CategoryDto;
 import com.incheon.notice.dto.UserPreferenceDto;
 import com.incheon.notice.entity.Category;
+import com.incheon.notice.entity.DetailCategory;
 import com.incheon.notice.entity.User;
+import com.incheon.notice.entity.UserDetailCategoryPreference;
 import com.incheon.notice.entity.UserPreference;
 import com.incheon.notice.repository.CategoryRepository;
+import com.incheon.notice.repository.DetailCategoryRepository;
+import com.incheon.notice.repository.UserDetailCategoryPreferenceRepository;
 import com.incheon.notice.repository.UserPreferenceRepository;
 import com.incheon.notice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -29,54 +35,75 @@ public class UserPreferenceService {
     private final UserPreferenceRepository userPreferenceRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final DetailCategoryRepository detailCategoryRepository;
+    private final UserDetailCategoryPreferenceRepository userDetailCategoryPreferenceRepository;
 
     /**
-     * 카테고리 구독 (알림 설정 생성)
+     * 전체 상세 카테고리와 사용자 구독 상태 조회
      */
-    @Transactional
-    public UserPreferenceDto.Response subscribe(Long userId, UserPreferenceDto.SubscribeRequest request) {
-        log.debug("카테고리 구독: userId={}, categoryId={}", userId, request.getCategoryId());
+    public List<UserPreferenceDto.DetailCategoryResponse> getDetailCategoriesWithSubscriptionStatus(Long userId) {
+        log.debug("상세 카테고리 목록 조회 (구독 상태 포함): userId={}", userId);
 
-        // 사용자 조회
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+        // 전체 상세 카테고리 조회
+        List<DetailCategory> allCategories = detailCategoryRepository.findAllByOrderByNameAsc();
 
-        // 카테고리 조회
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("카테고리를 찾을 수 없습니다: " + request.getCategoryId()));
+        // 사용자의 구독 설정 조회
+        List<UserDetailCategoryPreference> userPrefs = userDetailCategoryPreferenceRepository.findByUserId(userId);
 
-        // 이미 구독 중인지 확인
-        if (userPreferenceRepository.existsByUserIdAndCategoryId(userId, request.getCategoryId())) {
-            throw new RuntimeException("이미 구독 중인 카테고리입니다");
-        }
+        // 구독 상태 맵 생성
+        Map<Long, Boolean> subscriptionMap = userPrefs.stream()
+                .collect(Collectors.toMap(
+                        p -> p.getDetailCategory().getId(),
+                        UserDetailCategoryPreference::getEnabled
+                ));
 
-        // 알림 설정 생성
-        UserPreference preference = UserPreference.builder()
-                .user(user)
-                .category(category)
-                .notificationEnabled(request.getNotificationEnabled())
-                .build();
-
-        UserPreference savedPreference = userPreferenceRepository.save(preference);
-
-        return toResponse(savedPreference);
-    }
-
-    /**
-     * 내 구독 카테고리 목록 조회
-     */
-    public List<UserPreferenceDto.Response> getMyPreferences(Long userId) {
-        log.debug("내 구독 카테고리 목록 조회: userId={}", userId);
-
-        List<UserPreference> preferences = userPreferenceRepository.findByUserId(userId);
-
-        return preferences.stream()
-                .map(this::toResponse)
+        // DTO 변환
+        return allCategories.stream()
+                .map(cat -> UserPreferenceDto.DetailCategoryResponse.builder()
+                        .id(cat.getId())
+                        .name(cat.getName())
+                        .subscribed(subscriptionMap.getOrDefault(cat.getId(), false))
+                        .build())
                 .collect(Collectors.toList());
     }
 
     /**
-     * 알림 활성화된 구독 카테고리만 조회
+     * 상세 카테고리 구독 설정 일괄 업데이트
+     */
+    @Transactional
+    public List<UserPreferenceDto.DetailCategoryResponse> updateDetailCategorySubscriptions(
+            Long userId, UserPreferenceDto.DetailCategorySubscribeRequest request) {
+        log.debug("상세 카테고리 구독 설정 업데이트: userId={}, count={}", userId, request.getSubscriptions().size());
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+
+        for (UserPreferenceDto.DetailCategorySubscription subscription : request.getSubscriptions()) {
+            DetailCategory category = detailCategoryRepository.findById(subscription.getDetailCategoryId())
+                    .orElseThrow(() -> new RuntimeException("상세 카테고리를 찾을 수 없습니다: " + subscription.getDetailCategoryId()));
+
+            Optional<UserDetailCategoryPreference> existing =
+                    userDetailCategoryPreferenceRepository.findByUserIdAndDetailCategoryId(userId, subscription.getDetailCategoryId());
+
+            if (existing.isPresent()) {
+                // 기존 설정 업데이트
+                existing.get().updateEnabled(subscription.getEnabled());
+            } else {
+                // 새 설정 생성
+                UserDetailCategoryPreference newPref = UserDetailCategoryPreference.builder()
+                        .user(user)
+                        .detailCategory(category)
+                        .enabled(subscription.getEnabled())
+                        .build();
+                userDetailCategoryPreferenceRepository.save(newPref);
+            }
+        }
+
+        return getDetailCategoriesWithSubscriptionStatus(userId);
+    }
+
+    /**
+     * 알림 활성화된 구독 카테고리만 조회 (기존 카테고리 기반)
      */
     public List<UserPreferenceDto.Response> getActivePreferences(Long userId) {
         log.debug("활성화된 구독 카테고리 조회: userId={}", userId);
@@ -86,54 +113,6 @@ public class UserPreferenceService {
         return preferences.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * 특정 카테고리 구독 여부 확인
-     */
-    public boolean isSubscribed(Long userId, Long categoryId) {
-        return userPreferenceRepository.existsByUserIdAndCategoryId(userId, categoryId);
-    }
-
-    /**
-     * 알림 설정 변경 (활성화/비활성화)
-     */
-    @Transactional
-    public UserPreferenceDto.Response updateNotification(Long userId, Long categoryId,
-                                                         UserPreferenceDto.UpdateNotificationRequest request) {
-        log.debug("알림 설정 변경: userId={}, categoryId={}, enabled={}",
-                userId, categoryId, request.getNotificationEnabled());
-
-        UserPreference preference = userPreferenceRepository.findByUserIdAndCategoryId(userId, categoryId)
-                .orElseThrow(() -> new RuntimeException("구독하지 않은 카테고리입니다"));
-
-        // 자신의 설정인지 확인
-        if (!preference.getUser().getId().equals(userId)) {
-            throw new RuntimeException("권한이 없습니다");
-        }
-
-        // 알림 설정 변경
-        preference.toggleNotification(request.getNotificationEnabled());
-
-        return toResponse(preference);
-    }
-
-    /**
-     * 카테고리 구독 취소
-     */
-    @Transactional
-    public void unsubscribe(Long userId, Long categoryId) {
-        log.debug("카테고리 구독 취소: userId={}, categoryId={}", userId, categoryId);
-
-        UserPreference preference = userPreferenceRepository.findByUserIdAndCategoryId(userId, categoryId)
-                .orElseThrow(() -> new RuntimeException("구독하지 않은 카테고리입니다"));
-
-        // 자신의 설정인지 확인
-        if (!preference.getUser().getId().equals(userId)) {
-            throw new RuntimeException("권한이 없습니다");
-        }
-
-        userPreferenceRepository.delete(preference);
     }
 
     /**
