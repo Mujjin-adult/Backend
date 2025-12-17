@@ -41,7 +41,13 @@
       "Bash(java -version:*)",
       "Bash(lsof:*)",
       "Bash(pip3 list:*)",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "Bash(grep:*)",
+      "Bash(xargs cat:*)",
+      "Bash(time curl:*)",
+      "Bash(for i in 1 2 3 4 5)",
+      "Bash(do echo \"요청 $i:\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []
