@@ -1,12 +1,15 @@
 package com.incheon.notice.service;
 
 import com.incheon.notice.dto.NoticeDto;
+import com.incheon.notice.entity.Bookmark;
 import com.incheon.notice.entity.Category;
 import com.incheon.notice.entity.CrawlNotice;
+import com.incheon.notice.entity.UserDetailCategoryPreference;
 import com.incheon.notice.exception.NoticeNotFoundException;
 import com.incheon.notice.repository.BookmarkRepository;
 import com.incheon.notice.repository.CategoryRepository;
 import com.incheon.notice.repository.CrawlNoticeRepository;
+import com.incheon.notice.repository.UserDetailCategoryPreferenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
@@ -14,7 +17,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -28,6 +31,8 @@ public class NoticeService {
     private final CrawlNoticeRepository crawlNoticeRepository;
     private final BookmarkRepository bookmarkRepository;
     private final CategoryRepository categoryRepository;
+    private final CategoryService categoryService;
+    private final UserDetailCategoryPreferenceRepository userDetailCategoryPreferenceRepository;
 
     /**
      * 공지사항 목록 조회 (페이징, 필터링)
@@ -76,24 +81,37 @@ public class NoticeService {
         // 공지사항 조회
         Page<CrawlNotice> noticesPage = crawlNoticeRepository.findAll(spec, pageableWithSort);
 
-        // DTO로 변환
+        // 배치 조회를 위한 ID 목록 추출
+        List<CrawlNotice> notices = noticesPage.getContent();
+        List<Long> noticeIds = notices.stream()
+                .map(CrawlNotice::getId)
+                .toList();
+
+        // 카테고리 정보 배치 조회 (캐싱 적용됨)
+        Map<Long, Category> categoryMap = categoryService.getCategoryMap();
+
+        // 북마크 정보 배치 조회 (로그인 사용자만)
+        Set<Long> bookmarkedNoticeIds = Collections.emptySet();
+        if (userEmail != null && !noticeIds.isEmpty()) {
+            bookmarkedNoticeIds = bookmarkRepository.findBookmarkedNoticeIdsByUserEmail(userEmail, noticeIds);
+        }
+
+        // DTO로 변환 (배치 조회 결과 활용)
+        final Set<Long> finalBookmarkedIds = bookmarkedNoticeIds;
         return noticesPage.map(notice -> {
             NoticeDto.Response dto = NoticeDto.Response.from(notice);
 
-            // 카테고리 정보 설정 (categoryId 또는 source 기반)
-            Category category = findCategoryForNotice(notice);
-            if (category != null) {
-                dto.setCategoryName(category.getName());
-                dto.setCategoryCode(category.getCode());
-                dto.setSource(category.getName());  // source도 카테고리 name으로 설정
+            // 카테고리 정보 설정 (Map에서 O(1) 조회)
+            if (notice.getCategoryId() != null) {
+                Category category = categoryMap.get(notice.getCategoryId());
+                if (category != null) {
+                    dto.setCategoryName(category.getName());
+                    dto.setCategoryCode(category.getCode());
+                }
             }
 
-            // 북마크 상태 설정
-            if (userEmail != null) {
-                boolean isBookmarked = bookmarkRepository
-                        .existsByUser_EmailAndCrawlNotice_Id(userEmail, notice.getId());
-                dto.setBookmarked(isBookmarked);
-            }
+            // 북마크 상태 설정 (Set에서 O(1) 조회)
+            dto.setBookmarked(finalBookmarkedIds.contains(notice.getId()));
 
             return dto;
         });
@@ -140,91 +158,97 @@ public class NoticeService {
     }
 
     /**
-     * 관련 공지사항 조회 (같은 카테고리, 최신순)
+     * 북마크한 공지사항 조회
      *
-     * @param noticeId 기준 공지사항 ID
-     * @param limit    조회 개수
-     * @return 관련 공지사항 목록
+     * @param userId   사용자 ID
+     * @param pageable 페이징 정보
+     * @return 북마크한 공지사항 목록
      */
     @Transactional(readOnly = true)
-    public List<NoticeDto.Response> getRelatedNotices(Long noticeId, int limit) {
-        log.info("Fetching related notices for notice: {}, limit: {}", noticeId, limit);
+    public Page<NoticeDto.Response> getBookmarkedNotices(Long userId, Pageable pageable) {
+        log.info("Fetching bookmarked notices for user: {}", userId);
 
-        // 기준 공지사항 조회
-        CrawlNotice notice = crawlNoticeRepository.findById(noticeId)
-                .orElseThrow(() -> new NoticeNotFoundException(noticeId));
+        Page<Bookmark> bookmarks = bookmarkRepository.findByUserIdWithNotice(userId, pageable);
 
-        // 같은 카테고리의 다른 공지사항 조회
-        if (notice.getCategoryId() == null) {
-            log.warn("Notice {} has no category, returning empty related notices", noticeId);
-            return List.of();
-        }
+        // 카테고리 정보 배치 조회 (캐싱 적용됨)
+        Map<Long, Category> categoryMap = categoryService.getCategoryMap();
 
-        Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "publishedAt"));
+        return bookmarks.map(bookmark -> {
+            CrawlNotice notice = bookmark.getCrawlNotice();
+            NoticeDto.Response dto = NoticeDto.Response.from(notice);
+            dto.setBookmarked(true);
 
-        List<CrawlNotice> relatedNotices = crawlNoticeRepository
-                .findAll(
-                        (root, query, cb) -> cb.and(
-                                cb.equal(root.get("categoryId"), notice.getCategoryId()),
-                                cb.notEqual(root.get("id"), noticeId)
-                        ),
-                        pageable
-                )
-                .getContent();
+            // 카테고리 정보 설정 (Map에서 O(1) 조회)
+            if (notice.getCategoryId() != null) {
+                Category category = categoryMap.get(notice.getCategoryId());
+                if (category != null) {
+                    dto.setCategoryName(category.getName());
+                    dto.setCategoryCode(category.getCode());
+                }
+            }
 
-        // DTO로 변환
-        return relatedNotices.stream()
-                .map(related -> {
-                    NoticeDto.Response dto = NoticeDto.Response.from(related);
-
-                    // 카테고리 정보 설정 (categoryId 또는 source 기반)
-                    Category category = findCategoryForNotice(related);
-                    if (category != null) {
-                        dto.setCategoryName(category.getName());
-                        dto.setCategoryCode(category.getCode());
-                        dto.setSource(category.getName());  // source도 카테고리 name으로 설정
-                    }
-
-                    return dto;
-                })
-                .collect(Collectors.toList());
+            return dto;
+        });
     }
 
     /**
-     * 중요 공지사항 목록 조회
+     * 구독한 카테고리의 공지사항 조회
      *
-     * @param userEmail 현재 사용자 이메일
-     * @return 중요 공지사항 목록
+     * @param userId   사용자 ID
+     * @param pageable 페이징 정보
+     * @return 구독한 카테고리의 공지사항 목록
      */
     @Transactional(readOnly = true)
-    public List<NoticeDto.Response> getImportantNotices(String userEmail) {
-        log.info("Fetching important notices");
+    public Page<NoticeDto.Response> getSubscribedNotices(Long userId, Pageable pageable) {
+        log.info("Fetching subscribed notices for user: {}", userId);
 
-        List<CrawlNotice> importantNotices = crawlNoticeRepository
-                .findByIsImportantTrueOrderByPublishedAtDesc();
-
-        return importantNotices.stream()
-                .map(notice -> {
-                    NoticeDto.Response dto = NoticeDto.Response.from(notice);
-
-                    // 카테고리 정보 설정 (categoryId 또는 source 기반)
-                    Category category = findCategoryForNotice(notice);
-                    if (category != null) {
-                        dto.setCategoryName(category.getName());
-                        dto.setCategoryCode(category.getCode());
-                        dto.setSource(category.getName());  // source도 카테고리 name으로 설정
-                    }
-
-                    // 북마크 상태 설정
-                    if (userEmail != null) {
-                        boolean isBookmarked = bookmarkRepository
-                                .existsByUser_EmailAndCrawlNotice_Id(userEmail, notice.getId());
-                        dto.setBookmarked(isBookmarked);
-                    }
-
-                    return dto;
-                })
+        // 사용자가 구독한 상세 카테고리 목록 조회
+        List<String> subscribedCategories = userDetailCategoryPreferenceRepository
+                .findByUserIdAndEnabledTrue(userId)
+                .stream()
+                .map(pref -> pref.getDetailCategory().getName())
                 .collect(Collectors.toList());
+
+        if (subscribedCategories.isEmpty()) {
+            log.info("User {} has no subscribed categories", userId);
+            return Page.empty(pageable);
+        }
+
+        // 해당 카테고리의 공지사항 조회
+        Page<CrawlNotice> notices = crawlNoticeRepository.findByCategoryIn(subscribedCategories, pageable);
+
+        // 배치 조회를 위한 ID 목록 추출
+        List<Long> noticeIds = notices.getContent().stream()
+                .map(CrawlNotice::getId)
+                .toList();
+
+        // 카테고리 정보 배치 조회 (캐싱 적용됨)
+        Map<Long, Category> categoryMap = categoryService.getCategoryMap();
+
+        // 북마크 정보 배치 조회
+        Set<Long> bookmarkedNoticeIds = Collections.emptySet();
+        if (!noticeIds.isEmpty()) {
+            bookmarkedNoticeIds = bookmarkRepository.findBookmarkedNoticeIdsByUserId(userId, noticeIds);
+        }
+
+        final Set<Long> finalBookmarkedIds = bookmarkedNoticeIds;
+        return notices.map(notice -> {
+            NoticeDto.Response dto = NoticeDto.Response.from(notice);
+
+            // 북마크 상태 설정 (Set에서 O(1) 조회)
+            dto.setBookmarked(finalBookmarkedIds.contains(notice.getId()));
+
+            // 카테고리 정보 설정 (Map에서 O(1) 조회)
+            if (notice.getCategoryId() != null) {
+                Category category = categoryMap.get(notice.getCategoryId());
+                if (category != null) {
+                    dto.setCategoryName(category.getName());
+                    dto.setCategoryCode(category.getCode());
+                }
+            }
+
+            return dto;
+        });
     }
 
     /**

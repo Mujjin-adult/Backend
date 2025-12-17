@@ -1,7 +1,7 @@
 package com.incheon.notice.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
@@ -28,31 +28,14 @@ public class UserDto {
         private String name;
         private String role;
         private Boolean isActive;
-        private Boolean darkMode;
         private Boolean systemNotificationEnabled;
+        private DepartmentDto.Response department;  // 소속 학과 정보
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
     }
 
     /**
-     * 사용자 프로필 수정 요청 DTO
-     */
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UpdateProfileRequest {
-
-        @NotBlank(message = "이름은 필수입니다")
-        @Size(max = 50, message = "이름은 50자 이하여야 합니다")
-        private String name;
-
-        @Email(message = "유효한 이메일 형식이 아닙니다")
-        private String email;
-    }
-
-    /**
-     * 사용자 설정 수정 요청 DTO
+     * 사용자 시스템 알림 설정 요청 DTO
      */
     @Getter
     @Setter
@@ -60,8 +43,48 @@ public class UserDto {
     @AllArgsConstructor
     public static class UpdateSettingsRequest {
 
-        private Boolean darkMode;
         private Boolean systemNotificationEnabled;
+    }
+
+    /**
+     * 사용자 이름 수정 요청 DTO
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateNameRequest {
+
+        @NotBlank(message = "이름은 필수입니다")
+        @Size(max = 50, message = "이름은 50자 이하여야 합니다")
+        private String name;
+    }
+
+    /**
+     * 사용자 학번 수정 요청 DTO
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateStudentIdRequest {
+
+        @NotBlank(message = "학번은 필수입니다")
+        @Size(max = 20, message = "학번은 20자 이하여야 합니다")
+        private String studentId;
+    }
+
+    /**
+     * 사용자 학과 수정 요청 DTO
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateDepartmentRequest {
+
+        @NotNull(message = "학과 ID는 필수입니다")
+        private Long departmentId;
     }
 
     /**

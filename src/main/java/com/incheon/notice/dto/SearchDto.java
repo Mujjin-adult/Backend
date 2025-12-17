@@ -97,12 +97,12 @@ public class SearchDto {
         private String categoryName;
 
         /**
-         * 카테고리 코드 (있는 경우)
+         * 상세 카테고리 (crawl_notice.category 값)
          */
-        private String categoryCode;
+        private String detailCategory;
 
         /**
-         * 출처 (소스) - categories 테이블의 name 값
+         * 출처 (소스)
          */
         private String source;
 
@@ -117,6 +117,11 @@ public class SearchDto {
         private String author;
 
         /**
+         * 원본 날짜 문자열 (crawl_notice.date 값)
+         */
+        private String date;
+
+        /**
          * 게시일
          */
         private LocalDateTime publishedAt;
@@ -125,6 +130,11 @@ public class SearchDto {
          * 조회수
          */
         private Integer viewCount;
+
+        /**
+         * 원본 조회수 문자열 (crawl_notice.hits 값)
+         */
+        private String hits;
 
         /**
          * 중요 공지 여부
@@ -152,11 +162,14 @@ public class SearchDto {
                     .contentPreview(truncateContent(notice.getContent(), 200))
                     .url(notice.getUrl())
                     .categoryId(notice.getCategoryId())
+                    .detailCategory(notice.getCategory())
                     .source(notice.getSource())
                     .detailCategory(notice.getCategory())  // 세부 카테고리
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
+                    .date(notice.getDate())
                     .publishedAt(notice.getPublishedAt())
                     .viewCount(notice.getViewCount() != null ? notice.getViewCount() : 0)
+                    .hits(notice.getHits())
                     .isImportant(notice.getIsImportant())
                     .bookmarked(false)
                     .build();

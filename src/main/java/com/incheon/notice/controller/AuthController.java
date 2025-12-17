@@ -203,16 +203,4 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("로그아웃되었습니다. 클라이언트에서 Firebase signOut()을 호출하세요.", null));
     }
 
-    /**
-     * 아이디 찾기 (이름, 학번으로 이메일 찾기)
-     * POST /api/auth/find-id
-     */
-    @Operation(summary = "아이디 찾기", description = "이름과 학번으로 아이디(이메일)를 찾습니다. 마스킹된 이메일과 함께 전체 이메일이 발송됩니다.")
-    @PostMapping("/find-id")
-    public ResponseEntity<ApiResponse<AuthDto.FindIdResponse>> findId(
-            @Valid @RequestBody AuthDto.FindIdRequest request) {
-        AuthDto.FindIdResponse response = authService.findId(request);
-        return ResponseEntity.ok(ApiResponse.success("아이디 찾기 성공", response));
-    }
-
 }
