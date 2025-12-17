@@ -5,12 +5,15 @@ global:
 scrape_configs:
   - job_name: 'spring-boot'
     metrics_path: '/actuator/prometheus'
-    gce_sd_configs: 
+    gce_sd_configs:
       - project: 'project-f2639456-81ab-4842-bc5'
         zone: 'asia-northeast3-a'
-        filter: 'tags: "springboot-backend"'
-    
+
     relabel_configs:
+      # springboot-backend 태그가 있는 인스턴스만 유지
+      - source_labels: [__meta_gce_tags]
+        regex: '.*springboot-backend.*'
+        action: keep
       # Private IP + 포트 8080 설정 (MIG 인스턴스 자동 탐지)
       - source_labels: [__meta_gce_private_ip]
         target_label: __address__
