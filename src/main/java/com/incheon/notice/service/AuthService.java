@@ -38,10 +38,9 @@ public class AuthService {
      * 1. 이메일/학번 중복 체크
      * 2. Firebase Authentication에 사용자 생성
      * 3. DB에 사용자 저장 (Firebase UID 포함)
-     * 4. 이메일 인증 링크 발송
-     * 5. 성공 응답 (클라이언트는 이메일 인증 후 로그인)
+     * 4. 성공 응답
      *
-     * ⚠️ 중요:
+     * 중요:
      * - idToken은 클라이언트에서 로그인 후 발급받아야 합니다
      * - fcmToken도 클라이언트 디바이스에서 발급받아야 합니다
      * - 회원가입 후 반드시 login() API를 호출하여 토큰을 등록하세요

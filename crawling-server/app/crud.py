@@ -10,6 +10,7 @@ from models import (
     CrawlNotice,
     HostBudget,
     Webhook,
+    DetailCategory,
     JobStatus,
     TaskStatus,
     SeedType,
@@ -520,4 +521,117 @@ def bulk_update_notice_contents(
 
     except Exception as e:
         db.rollback()
+        raise e
+
+
+# ==================== DetailCategory CRUD ====================
+
+
+def get_all_detail_categories(db: Session) -> List[DetailCategory]:
+    """모든 세부 카테고리 조회"""
+    return db.query(DetailCategory).all()
+
+
+def get_detail_category_by_name(db: Session, name: str) -> Optional[DetailCategory]:
+    """이름으로 세부 카테고리 조회"""
+    return db.query(DetailCategory).filter(DetailCategory.name == name).first()
+
+
+def create_detail_category(
+    db: Session,
+    name: str,
+    description: Optional[str] = None
+) -> DetailCategory:
+    """새로운 세부 카테고리 생성"""
+    db_category = DetailCategory(
+        name=name,
+        description=description,
+        is_active=True
+    )
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    return db_category
+
+
+def sync_detail_categories(db: Session) -> Dict[str, Any]:
+    """
+    crawl_notice의 category 값을 detail_category 테이블에 동기화
+
+    크롤링된 공지사항의 category 필드에서 고유한 값을 추출하여
+    detail_category 테이블에 없는 카테고리가 있으면 자동으로 추가합니다.
+
+    Returns:
+        Dict: 동기화 결과
+            - new_categories: 새로 추가된 카테고리 목록
+            - existing_categories: 기존 카테고리 목록
+            - total_categories: 전체 카테고리 수
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        # 1. crawl_notice에서 고유한 category 값 조회 (NULL과 빈 문자열 제외)
+        distinct_categories = db.query(CrawlNotice.category).filter(
+            and_(
+                CrawlNotice.category != None,
+                CrawlNotice.category != ""
+            )
+        ).distinct().all()
+
+        crawled_categories = {cat[0] for cat in distinct_categories if cat[0]}
+
+        # 2. detail_category에서 기존 카테고리 이름 조회
+        existing_detail_categories = db.query(DetailCategory.name).all()
+        existing_names = {cat[0] for cat in existing_detail_categories}
+
+        # 3. 새로운 카테고리 찾기
+        new_categories = crawled_categories - existing_names
+
+        # 4. 새 카테고리 추가
+        added_categories = []
+        for category_name in new_categories:
+            try:
+                new_cat = DetailCategory(
+                    name=category_name,
+                    description=f"자동 생성: {category_name} 관련 공지",
+                    is_active=True
+                )
+                db.add(new_cat)
+                added_categories.append(category_name)
+                logger.info(f"새 detail_category 추가: {category_name}")
+            except Exception as e:
+                logger.error(f"detail_category 추가 실패: {category_name}, error={e}")
+                continue
+
+        # 5. 커밋
+        if added_categories:
+            db.commit()
+            logger.info(f"detail_category 동기화 완료: {len(added_categories)}개 추가")
+
+        # 6. 기존 카테고리 updated_at 갱신 (활성 상태 확인)
+        updated_count = 0
+        for category_name in (crawled_categories & existing_names):
+            existing_cat = db.query(DetailCategory).filter(
+                DetailCategory.name == category_name
+            ).first()
+            if existing_cat:
+                existing_cat.updated_at = datetime.utcnow()
+                updated_count += 1
+
+        if updated_count > 0:
+            db.commit()
+            logger.info(f"detail_category updated_at 갱신: {updated_count}개")
+
+        return {
+            "new_categories": added_categories,
+            "existing_categories": list(crawled_categories & existing_names),
+            "total_categories": len(crawled_categories),
+            "added_count": len(added_categories),
+            "updated_count": updated_count
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"detail_category 동기화 실패: {e}")
         raise e

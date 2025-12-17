@@ -38,7 +38,6 @@ public class AuthController {
             **플로우:**
             1. **회원가입 API 호출** (이 엔드포인트)
                - 서버: Firebase에 사용자 생성 + DB 저장
-               - 서버: 이메일 인증 링크 발송
 
             2. **클라이언트: Firebase 로그인**
                ```javascript
@@ -65,9 +64,8 @@ public class AuthController {
                ```
 
             **중요:**
-            - ⚠️ idToken과 fcmToken은 서버에서 발급할 수 없습니다
-            - ⚠️ 회원가입 후 반드시 위 2-4 단계를 진행해야 합니다
-            - 이메일 인증은 선택사항 (인증 전에도 로그인 가능)
+            - idToken과 fcmToken은 서버에서 발급할 수 없습니다
+            - 회원가입 후 반드시 위 2-4 단계를 진행해야 합니다
 
             **대안 방법 (클라이언트 우선):**
             1. 클라이언트: Firebase SDK로 직접 회원가입 `createUserWithEmailAndPassword()`

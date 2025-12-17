@@ -107,6 +107,11 @@ public class SearchDto {
         private String source;
 
         /**
+         * 세부 카테고리 (crawl_notice.category)
+         */
+        private String detailCategory;
+
+        /**
          * 작성자
          */
         private String author;
@@ -159,6 +164,7 @@ public class SearchDto {
                     .categoryId(notice.getCategoryId())
                     .detailCategory(notice.getCategory())
                     .source(notice.getSource())
+                    .detailCategory(notice.getCategory())  // 세부 카테고리
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .date(notice.getDate())
                     .publishedAt(notice.getPublishedAt())
