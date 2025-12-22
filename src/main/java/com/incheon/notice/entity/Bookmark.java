@@ -10,11 +10,11 @@ import lombok.*;
 @Entity
 @Table(name = "bookmarks",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_user_notice", columnNames = {"user_id", "notice_id"})
+        @UniqueConstraint(name = "uk_user_crawl_notice", columnNames = {"user_id", "crawl_notice_id"})
     },
     indexes = {
         @Index(name = "idx_user_id", columnList = "user_id"),
-        @Index(name = "idx_notice_id", columnList = "notice_id")
+        @Index(name = "idx_crawl_notice_id", columnList = "crawl_notice_id")
     }
 )
 @Getter
@@ -32,8 +32,8 @@ public class Bookmark extends BaseEntity {
     private User user;  // 사용자
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "notice_id", nullable = false)
-    private Notice notice;  // 공지사항
+    @JoinColumn(name = "crawl_notice_id", nullable = false)
+    private CrawlNotice crawlNotice;  // 크롤링 공지사항
 
     @Column(length = 500)
     private String memo;  // 사용자 메모

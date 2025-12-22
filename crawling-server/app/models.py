@@ -1,58 +1,174 @@
-"""
-SQLAlchemy 모델 정의
-Spring Boot의 JPA 엔티티와 동일한 구조
-"""
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Index
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    Boolean,
+    Float,
+    DateTime,
+    JSON,
+    ForeignKey,
+    Enum,
+)
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from database import Base
+import enum
+
+Base = declarative_base()
 
 
-class Category(Base):
-    """카테고리 모델 (Spring Boot의 Category 엔티티와 동일)"""
-    __tablename__ = "categories"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    code = Column(String(50), unique=True, nullable=False, index=True)
-    name = Column(String(100), nullable=False)
-    type = Column(String(20), nullable=False)  # CategoryType enum
-    url = Column(String(255))
-    is_active = Column(Boolean, default=True, nullable=False)
-    description = Column(String(500))
-
-    # BaseEntity 필드
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-    # Relationship
-    notices = relationship("Notice", back_populates="category")
+class SeedType(str, enum.Enum):
+    URL_LIST = "URL_LIST"
+    SITEMAP = "SITEMAP"
+    DOMAIN = "DOMAIN"
+    SEARCH = "SEARCH"
 
 
-class Notice(Base):
-    """공지사항 모델 (Spring Boot의 Notice 엔티티와 동일)"""
-    __tablename__ = "notices"
-    __table_args__ = (
-        Index('idx_category_id', 'category_id'),
-        Index('idx_published_at', 'published_at'),
-        Index('idx_external_id', 'external_id'),
+class RenderMode(str, enum.Enum):
+    STATIC = "STATIC"
+    HEADLESS = "HEADLESS"
+    AUTO = "AUTO"
+
+
+class RobotsPolicy(str, enum.Enum):
+    OBEY = "OBEY"
+    IGNORE_WHITELIST = "IGNORE_WHITELIST"
+
+
+class WebhookEvent(str, enum.Enum):
+    JOB_DONE = "JOB_DONE"
+    DOC_READY = "DOC_READY"
+    ERROR = "ERROR"
+
+
+class TaskStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    RETRY = "RETRY"
+    BLOCKED = "BLOCKED"
+
+
+class JobStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    ERROR = "ERROR"
+
+
+class CrawlJob(Base):
+    __tablename__ = "crawl_job"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(128), nullable=False, index=True)
+    priority = Column(String(4), nullable=False, index=True)  # P0, P1, P2, P3
+    schedule_cron = Column(String(64), nullable=True)
+    seed_type = Column(Enum(SeedType), nullable=False)
+    seed_payload = Column(JSON, nullable=False)
+    render_mode = Column(Enum(RenderMode), nullable=False)
+    rate_limit_per_host = Column(Float, default=1.0)
+    max_depth = Column(Integer, default=1)
+    robots_policy = Column(Enum(RobotsPolicy), nullable=False)
+    status = Column(Enum(JobStatus), default=JobStatus.ACTIVE, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    title = Column(String(500), nullable=False)
-    content = Column(Text)
-    url = Column(String(1000), nullable=False)
-    external_id = Column(String(100), unique=True)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
-    author = Column(String(100))
-    published_at = Column(DateTime(timezone=True), nullable=False)
-    view_count = Column(Integer)
-    is_important = Column(Boolean, default=False, nullable=False)
-    is_pinned = Column(Boolean, default=False, nullable=False)
-    attachments = Column(Text)
+    # Relationships
+    tasks = relationship("CrawlTask", back_populates="job")
+    documents = relationship("CrawlNotice", back_populates="job")
+    webhooks = relationship("Webhook", back_populates="job")
 
-    # BaseEntity 필드
+
+class CrawlTask(Base):
+    __tablename__ = "crawl_task"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("crawl_job.id"), nullable=False, index=True)
+    url = Column(Text, nullable=False, index=True)
+    status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, index=True)
+    retries = Column(Integer, default=0)
+    last_error = Column(Text, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    http_status = Column(Integer, nullable=True)
+    content_hash = Column(String(64), nullable=True, index=True)
+    blocked_flag = Column(Boolean, default=False, index=True)
+    cost_ms_browser = Column(Integer, nullable=True)
+    attempt_strategy = Column(JSON, nullable=True)
+
+    # Relationships
+    job = relationship("CrawlJob", back_populates="tasks")
+
+
+class CrawlNotice(Base):
+    __tablename__ = "crawl_notice"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("crawl_job.id"), nullable=False, index=True)
+    url = Column(Text, nullable=False, index=True)
+
+    # 크롤링된 필드들
+    title = Column(Text, nullable=True)
+    writer = Column(String(128), nullable=True)
+    date = Column(String(32), nullable=True)
+    hits = Column(String(32), nullable=True)
+    category = Column(String(64), nullable=True)
+    source = Column(String(64), nullable=True)
+
+    # 메인 서버 통합을 위한 추가 필드들
+    content = Column(Text, nullable=True)  # 공지사항 본문 내용
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())  # 업데이트 시간
+
+    # 원본 데이터 (deprecated - 하위 호환성 유지)
+    extracted = Column(JSON, nullable=True)
+    raw = Column(Text, nullable=True)
+
+    snapshot_version = Column(String(32), nullable=True)
+    fingerprint = Column(String(64), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    job = relationship("CrawlJob", back_populates="documents")
+
+
+class HostBudget(Base):
+    __tablename__ = "host_budget"
+
+    host = Column(String(128), primary_key=True, index=True)
+    qps_limit = Column(Float, default=1.0)
+    concurrency_limit = Column(Integer, default=1)
+    daily_budget_sec_browser = Column(Integer, default=3600)  # 1시간
+    used_today_sec = Column(Integer, default=0)
+
+
+class Webhook(Base):
+    __tablename__ = "webhook"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("crawl_job.id"), nullable=False, index=True)
+    target_url = Column(Text, nullable=False)
+    event = Column(Enum(WebhookEvent), nullable=False)
+    secret = Column(String(128), nullable=True)
+
+    # Relationships
+    job = relationship("CrawlJob", back_populates="webhooks")
+
+
+class DetailCategory(Base):
+    """
+    세부 카테고리 테이블
+    크롤링된 공지사항의 category 값을 자동으로 동기화
+    """
+    __tablename__ = "detail_category"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True, index=True)
+    description = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-    # Relationship
-    category = relationship("Category", back_populates="notices")

@@ -1,0 +1,63 @@
+package com.incheon.notice.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+
+/**
+ * 이메일 발송 서비스
+ * SMTP를 통한 이메일 전송
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class EmailService {
+
+    private final JavaMailSender mailSender;
+
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
+    /**
+     * 아이디 찾기 메일 발송
+     */
+    public void sendFindIdEmail(String toEmail) {
+        log.debug("아이디 찾기 메일 발송: toEmail={}", toEmail);
+
+        String subject = "[인천대 공지사항] 아이디 찾기";
+
+        String content = String.format(
+                "아이디 찾기 요청이 접수되었습니다.\n\n" +
+                "회원가입 시 사용하신 이메일 주소는 다음과 같습니다:\n\n" +
+                "%s\n\n" +
+                "이 이메일을 사용하여 로그인하실 수 있습니다.\n\n" +
+                "본인이 요청하지 않은 경우 이 이메일을 무시해주세요.",
+                toEmail
+        );
+
+        sendEmail(toEmail, subject, content);
+    }
+
+    /**
+     * 일반 이메일 발송
+     */
+    private void sendEmail(String to, String subject, String content) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(to);
+            message.setSubject(subject);
+            message.setText(content);
+
+            mailSender.send(message);
+            log.info("이메일 발송 성공: to={}, subject={}", to, subject);
+
+        } catch (Exception e) {
+            log.error("이메일 발송 실패: to={}, error={}", to, e.getMessage(), e);
+            throw new RuntimeException("이메일 발송에 실패했습니다", e);
+        }
+    }
+}

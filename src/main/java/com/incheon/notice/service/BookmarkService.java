@@ -1,0 +1,156 @@
+package com.incheon.notice.service;
+
+import com.incheon.notice.dto.BookmarkDto;
+import com.incheon.notice.dto.NoticeDto;
+import com.incheon.notice.entity.Bookmark;
+import com.incheon.notice.entity.Category;
+import com.incheon.notice.entity.CrawlNotice;
+import com.incheon.notice.entity.User;
+import com.incheon.notice.repository.BookmarkRepository;
+import com.incheon.notice.repository.CategoryRepository;
+import com.incheon.notice.repository.CrawlNoticeRepository;
+import com.incheon.notice.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * 북마크 서비스
+ * 사용자의 공지사항 북마크 관리
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class BookmarkService {
+
+    private final BookmarkRepository bookmarkRepository;
+    private final CrawlNoticeRepository crawlNoticeRepository;
+    private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
+
+    /**
+     * 북마크 생성
+     */
+    @Transactional
+    public BookmarkDto.Response createBookmark(Long userId, BookmarkDto.CreateRequest request) {
+        log.debug("북마크 생성: userId={}, noticeId={}", userId, request.getNoticeId());
+
+        // 사용자 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+
+        // 공지사항 조회
+        CrawlNotice notice = crawlNoticeRepository.findById(request.getNoticeId())
+                .orElseThrow(() -> new RuntimeException("공지사항을 찾을 수 없습니다: " + request.getNoticeId()));
+
+        // 이미 북마크되어 있는지 확인
+        if (bookmarkRepository.existsByUserIdAndCrawlNoticeId(userId, request.getNoticeId())) {
+            throw new RuntimeException("이미 북마크한 공지사항입니다");
+        }
+
+        // 북마크 생성 (memo 없이)
+        Bookmark bookmark = Bookmark.builder()
+                .user(user)
+                .crawlNotice(notice)
+                .build();
+
+        Bookmark savedBookmark = bookmarkRepository.save(bookmark);
+
+        return toResponse(savedBookmark);
+    }
+
+    /**
+     * 북마크 삭제
+     */
+    @Transactional
+    public void deleteBookmark(Long userId, Long bookmarkId) {
+        log.debug("북마크 삭제: userId={}, bookmarkId={}", userId, bookmarkId);
+
+        Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
+                .orElseThrow(() -> new RuntimeException("북마크를 찾을 수 없습니다: " + bookmarkId));
+
+        // 자신의 북마크인지 확인
+        if (!bookmark.getUser().getId().equals(userId)) {
+            throw new RuntimeException("권한이 없습니다");
+        }
+
+        bookmarkRepository.delete(bookmark);
+    }
+
+    /**
+     * 특정 공지사항 북마크 여부 확인 (내부용)
+     */
+    public boolean isBookmarked(Long userId, Long noticeId) {
+        return bookmarkRepository.existsByUserIdAndCrawlNoticeId(userId, noticeId);
+    }
+
+    /**
+     * 북마크 엔티티를 응답 DTO로 변환
+     */
+    private BookmarkDto.Response toResponse(Bookmark bookmark) {
+        CrawlNotice notice = bookmark.getCrawlNotice();
+
+        // 카테고리 정보 조회 (categoryId 또는 source 기반)
+        Category category = findCategoryForNotice(notice);
+
+        NoticeDto.Response noticeResponse = NoticeDto.Response.builder()
+                .id(notice.getId())
+                .title(notice.getTitle())
+                .url(notice.getUrl())
+                .categoryId(notice.getCategoryId())
+                .detailCategory(notice.getCategory())  // 세부 카테고리
+                .author(notice.getAuthor())
+                .publishedAt(notice.getPublishedAt())
+                .viewCount(notice.getViewCount())
+                .isImportant(notice.getIsImportant())
+                .isPinned(notice.getIsPinned())
+                .bookmarked(true)
+                .build();
+
+        // 카테고리 정보 설정
+        if (category != null) {
+            noticeResponse.setCategoryName(category.getName());
+            noticeResponse.setCategoryCode(category.getCode());
+            noticeResponse.setSource(category.getName());
+        } else {
+            noticeResponse.setSource(notice.getSource());
+        }
+
+        return BookmarkDto.Response.builder()
+                .id(bookmark.getId())
+                .notice(NoticeDto.Response.builder()
+                        .id(notice.getId())
+                        .title(notice.getTitle())
+                        .url(notice.getUrl())
+                        .author(notice.getAuthor())
+                        .publishedAt(notice.getPublishedAt())
+                        .viewCount(notice.getViewCount())
+                        .isImportant(notice.getIsImportant())
+                        .isPinned(notice.getIsPinned())
+                        .bookmarked(true)
+                        .build())
+                .createdAt(bookmark.getCreatedAt())
+                .build();
+    }
+
+    /**
+     * 공지사항에 해당하는 카테고리 조회
+     * 1. categoryId가 있으면 해당 ID로 조회
+     * 2. categoryId가 없고 source가 있으면 source를 code로 사용하여 조회
+     */
+    private Category findCategoryForNotice(CrawlNotice notice) {
+        // 1. categoryId로 조회
+        if (notice.getCategoryId() != null) {
+            return categoryRepository.findById(notice.getCategoryId()).orElse(null);
+        }
+
+        // 2. source를 code로 사용하여 조회
+        if (notice.getSource() != null && !notice.getSource().isEmpty()) {
+            return categoryRepository.findByCode(notice.getSource()).orElse(null);
+        }
+
+        return null;
+    }
+}
