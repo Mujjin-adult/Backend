@@ -154,23 +154,22 @@ public class SearchService {
     ) {
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT ");
-        sql.append("  id, ");
+        sql.append("  id, ");                                                    // 0
         sql.append("  ts_headline('simple', title, to_tsquery('simple', :tsquery), ");
-        sql.append("    'StartSel=<mark>, StopSel=</mark>, MaxWords=10, MinWords=5') AS highlighted_title, ");
+        sql.append("    'StartSel=<mark>, StopSel=</mark>, MaxWords=10, MinWords=5') AS highlighted_title, ");  // 1
         sql.append("  ts_headline('simple', COALESCE(content, ''), to_tsquery('simple', :tsquery), ");
-        sql.append("    'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15, MaxFragments=1') AS highlighted_content, ");
-        sql.append("  url, ");
-        sql.append("  category_id, ");
-        sql.append("  category, ");
-        sql.append("  source, ");
-        sql.append("  category AS detail_category, ");
-        sql.append("  COALESCE(author, writer) AS author, ");
-        sql.append("  published_at, ");
-        sql.append("  COALESCE(view_count, 0) AS view_count, ");
-        sql.append("  hits, ");
-        sql.append("  date, ");
-        sql.append("  is_important, ");
-        sql.append("  ts_rank(search_vector, to_tsquery('simple', :tsquery)) AS relevance_score ");
+        sql.append("    'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15, MaxFragments=1') AS highlighted_content, ");  // 2
+        sql.append("  url, ");                                                   // 3
+        sql.append("  category_id, ");                                           // 4
+        sql.append("  category, ");                                              // 5 (detailCategory)
+        sql.append("  source, ");                                                // 6
+        sql.append("  COALESCE(author, writer) AS author, ");                    // 7
+        sql.append("  published_at, ");                                          // 8
+        sql.append("  COALESCE(view_count, 0) AS view_count, ");                 // 9
+        sql.append("  hits, ");                                                  // 10
+        sql.append("  date, ");                                                  // 11
+        sql.append("  is_important, ");                                          // 12
+        sql.append("  ts_rank(search_vector, to_tsquery('simple', :tsquery)) AS relevance_score ");  // 13
         sql.append("FROM crawl_notice ");
         sql.append("WHERE search_vector @@ to_tsquery('simple', :tsquery) ");
 
@@ -204,9 +203,20 @@ public class SearchService {
         List<Object[]> rows = query.getResultList();
 
         // Object[] -> SearchResult 변환
-        // 컬럼 순서: id, highlighted_title, highlighted_content, url, category_id, category, source, author, published_at, view_count, hits, date, is_important, relevance_score
+        // 컬럼 순서: id(0), highlighted_title(1), highlighted_content(2), url(3), category_id(4),
+        //          category(5), source(6), author(7), published_at(8), view_count(9),
+        //          hits(10), date(11), is_important(12), relevance_score(13)
         List<SearchDto.SearchResult> results = new ArrayList<>();
         for (Object[] row : rows) {
+            LocalDateTime publishedAt = null;
+            if (row[8] != null) {
+                if (row[8] instanceof Timestamp) {
+                    publishedAt = ((Timestamp) row[8]).toLocalDateTime();
+                } else if (row[8] instanceof LocalDateTime) {
+                    publishedAt = (LocalDateTime) row[8];
+                }
+            }
+
             SearchDto.SearchResult result = SearchDto.SearchResult.builder()
                     .id(((Number) row[0]).longValue())
                     .title((String) row[1])  // highlighted_title
@@ -216,10 +226,10 @@ public class SearchService {
                     .detailCategory((String) row[5])  // category
                     .source((String) row[6])
                     .author((String) row[7])
-                    .publishedAt(row[8] != null ? ((Timestamp) row[8]).toLocalDateTime() : null)
+                    .publishedAt(publishedAt)
                     .viewCount(((Number) row[9]).intValue())
-                    .hits((String) row[10])  // hits
-                    .date((String) row[11])  // date
+                    .hits((String) row[10])
+                    .date((String) row[11])
                     .isImportant((Boolean) row[12])
                     .relevanceScore(row[13] != null ? ((Number) row[13]).doubleValue() : 0.0)
                     .bookmarked(false)

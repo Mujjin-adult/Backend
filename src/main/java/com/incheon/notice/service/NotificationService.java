@@ -65,9 +65,11 @@ public class NotificationService {
         Map<Long, List<NotificationKeyword>> keywordsByUser = matchingKeywords.stream()
                 .collect(Collectors.groupingBy(nk -> nk.getUser().getId()));
 
-        // 3. FCM 토큰 수집 및 알림 발송
+        // 3. FCM 토큰 수집 및 알림 발송 (시스템 알림이 활성화된 사용자만)
         List<String> fcmTokens = matchingKeywords.stream()
-                .map(nk -> nk.getUser().getFcmToken())
+                .map(NotificationKeyword::getUser)
+                .filter(user -> Boolean.TRUE.equals(user.getSystemNotificationEnabled()))
+                .map(User::getFcmToken)
                 .distinct()
                 .filter(token -> token != null && !token.isEmpty())
                 .collect(Collectors.toList());

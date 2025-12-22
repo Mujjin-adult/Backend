@@ -4,11 +4,14 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import com.incheon.notice.dto.AuthDto;
+import com.incheon.notice.entity.Department;
 import com.incheon.notice.entity.User;
 import com.incheon.notice.entity.UserRole;
 import com.incheon.notice.exception.BusinessException;
 import com.incheon.notice.exception.DuplicateResourceException;
+import com.incheon.notice.repository.DepartmentRepository;
 import com.incheon.notice.repository.UserRepository;
+import com.incheon.notice.security.JwtTokenProvider;
 import com.incheon.notice.security.FirebaseTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final FirebaseTokenProvider firebaseTokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * 회원가입 (Firebase 통합)
@@ -90,6 +95,10 @@ public class AuthService {
             throw new BusinessException("회원가입에 실패했습니다: " + e.getMessage());
         }
 
+        // 학과 조회 (필수)
+        Department department = departmentRepository.findByName(request.getDepartmentName())
+                .orElseThrow(() -> new BusinessException("존재하지 않는 학과입니다: " + request.getDepartmentName()));
+
         // DB에 사용자 저장 (Firebase UID 포함)
         User user = User.builder()
                 .firebaseUid(firebaseUid)
@@ -97,6 +106,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName())
+                .department(department)
                 .role(UserRole.USER)
                 .isActive(true)
                 .isEmailVerified(false)
@@ -104,7 +114,8 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        log.info("회원가입 완료: email={}, firebaseUid={}", savedUser.getEmail(), firebaseUid);
+        log.info("회원가입 완료: email={}, firebaseUid={}, department={}",
+                savedUser.getEmail(), firebaseUid, department.getName());
 
         return AuthDto.UserResponse.builder()
                 .id(savedUser.getId())
@@ -112,22 +123,18 @@ public class AuthService {
                 .email(savedUser.getEmail())
                 .name(savedUser.getName())
                 .role(savedUser.getRole().name())
+                .departmentName(department.getName())
                 .build();
     }
 
     /**
-     * 이메일/비밀번호 로그인 (서버 인증 + Firebase 커스텀 토큰 발급)
+     * 이메일/비밀번호 로그인 (서버 JWT 토큰 발급)
      *
-     * 서버에서 이메일/비밀번호를 검증하고 Firebase 커스텀 토큰을 발급합니다.
-     *
-     * 플로우:
-     * 1. 이메일/비밀번호 검증 (DB)
-     * 2. Firebase 커스텀 토큰 생성
-     * 3. 사용자 정보와 커스텀 토큰 반환
-     * 4. 클라이언트: 커스텀 토큰으로 Firebase 로그인 (선택사항)
+     * 서버에서 이메일/비밀번호를 검증하고 서버 자체 JWT 토큰을 발급합니다.
+     * 이 토큰으로 모든 API에 접근할 수 있습니다.
      *
      * @param request 이메일/비밀번호
-     * @return 로그인 응답 (커스텀 토큰 포함)
+     * @return 로그인 응답 (JWT 토큰 포함)
      */
     @Transactional
     public AuthDto.LoginResponse loginWithEmail(AuthDto.EmailLoginRequest request) {
@@ -151,68 +158,22 @@ public class AuthService {
             userRepository.save(user);
         }
 
-        String customToken = null;
-        String firebaseUid = user.getFirebaseUid();
+        // 5. 서버 JWT 토큰 생성
+        String jwtToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail());
+        log.info("이메일 로그인 성공 - JWT 토큰 발급: email={}", user.getEmail());
 
-        // 5. Firebase UID가 없는 경우 자동 생성
-        if (firebaseUid == null || firebaseUid.isEmpty()) {
-            try {
-                // Firebase에 사용자 생성
-                var userRecord = FirebaseAuth.getInstance()
-                        .createUser(new com.google.firebase.auth.UserRecord.CreateRequest()
-                                .setEmail(user.getEmail())
-                                .setPassword(request.getPassword())
-                                .setDisplayName(user.getName())
-                                .setEmailVerified(false));
-                firebaseUid = userRecord.getUid();
-                user.updateFirebaseUid(firebaseUid);
-                userRepository.save(user);
-                log.info("로그인 시 Firebase 사용자 자동 생성: email={}, uid={}", user.getEmail(), firebaseUid);
-            } catch (FirebaseAuthException e) {
-                // Firebase에 이미 존재하는 경우
-                if (e.getAuthErrorCode().name().equals("EMAIL_ALREADY_EXISTS")) {
-                    try {
-                        var existingUser = FirebaseAuth.getInstance().getUserByEmail(user.getEmail());
-                        firebaseUid = existingUser.getUid();
-                        user.updateFirebaseUid(firebaseUid);
-                        userRepository.save(user);
-                        log.info("로그인 시 기존 Firebase UID 연결: email={}, uid={}", user.getEmail(), firebaseUid);
-                    } catch (FirebaseAuthException ex) {
-                        log.error("Firebase 사용자 조회 실패: email={}, error={}", user.getEmail(), ex.getMessage());
-                    }
-                } else {
-                    log.error("Firebase 사용자 생성 실패: email={}, error={}", user.getEmail(), e.getMessage());
-                }
-            }
-        }
-
-        // 6. Firebase 커스텀 토큰 생성 (Firebase UID가 있는 경우)
-        if (firebaseUid != null && !firebaseUid.isEmpty()) {
-            try {
-                customToken = FirebaseAuth.getInstance().createCustomToken(firebaseUid);
-                log.info("Firebase 커스텀 토큰 생성 완료: email={}, uid={}", user.getEmail(), firebaseUid);
-            } catch (FirebaseAuthException e) {
-                log.error("Firebase 커스텀 토큰 생성 실패: email={}, uid={}, error={}", user.getEmail(), firebaseUid, e.getMessage());
-                // 커스텀 토큰 생성 실패 시 Firebase UID가 유효하지 않을 수 있으므로 null로 초기화
-                if (e.getAuthErrorCode().name().equals("USER_NOT_FOUND")) {
-                    user.updateFirebaseUid(null);
-                    userRepository.save(user);
-                    log.warn("유효하지 않은 Firebase UID 제거: email={}, invalidUid={}", user.getEmail(), firebaseUid);
-                }
-            }
-        }
-
-        // 7. 응답 생성
+        // 6. 응답 생성
         return AuthDto.LoginResponse.builder()
-                .idToken(customToken)  // Firebase 커스텀 토큰 (클라이언트에서 Firebase 로그인 시 사용)
+                .idToken(jwtToken)  // 서버 JWT 토큰
                 .tokenType("Bearer")
-                .expiresIn(3600L)
+                .expiresIn(jwtTokenProvider.getExpirationInSeconds())
                 .user(AuthDto.UserResponse.builder()
                         .id(user.getId())
                         .studentId(user.getStudentId())
                         .email(user.getEmail())
                         .name(user.getName())
                         .role(user.getRole().name())
+                        .departmentName(user.getDepartment() != null ? user.getDepartment().getName() : null)
                         .build())
                 .build();
     }
@@ -289,6 +250,7 @@ public class AuthService {
                             .email(user.getEmail())
                             .name(user.getName())
                             .role(user.getRole().name())
+                            .departmentName(user.getDepartment() != null ? user.getDepartment().getName() : null)
                             .build())
                     .build();
         } catch (FirebaseAuthException e) {

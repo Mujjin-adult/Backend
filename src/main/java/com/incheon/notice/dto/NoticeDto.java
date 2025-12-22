@@ -29,7 +29,6 @@ public class NoticeDto {
         private String categoryCode;
         private String detailCategory;  // crawl_notice.category 값
         private String source;
-        private String detailCategory;  // 세부 카테고리 (crawl_notice.category)
         private String author;
         private String date;  // crawl_notice.date 값 (원본 날짜 문자열)
         private LocalDateTime publishedAt;
@@ -50,7 +49,6 @@ public class NoticeDto {
                     .categoryId(notice.getCategoryId())
                     .detailCategory(notice.getCategory())
                     .source(notice.getSource())
-                    .detailCategory(notice.getCategory())  // 세부 카테고리
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .date(notice.getDate())
                     .publishedAt(notice.getPublishedAt())
@@ -94,7 +92,6 @@ public class NoticeDto {
         private CategoryDto.Response category;
         private String detailCategory;  // crawl_notice.category 값
         private String source;
-        private String detailCategory;  // 세부 카테고리 (crawl_notice.category)
         private String author;
         private String date;  // crawl_notice.date 값 (원본 날짜 문자열)
         private LocalDateTime publishedAt;
@@ -120,7 +117,6 @@ public class NoticeDto {
                     .categoryId(notice.getCategoryId())
                     .detailCategory(notice.getCategory())
                     .source(notice.getSource())
-                    .detailCategory(notice.getCategory())  // 세부 카테고리
                     .author(notice.getAuthor() != null ? notice.getAuthor() : notice.getWriter())
                     .date(notice.getDate())
                     .publishedAt(notice.getPublishedAt())
