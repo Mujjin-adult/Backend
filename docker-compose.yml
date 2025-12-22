@@ -2,36 +2,37 @@ version: '3.8'
 
 services:
   # PostgreSQL 데이터베이스
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: incheon-notice-db
-  #   environment:
-  #     POSTGRES_DB: incheon_notice
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  postgres:
+    image: postgres:16-alpine
+    container_name: incheon-notice-db
+    environment:
+      POSTGRES_DB: incheon_notice
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql.gz:/docker-entrypoint-initdb.d/init.sql.gz:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # # Redis 캐시
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: incheon-notice-redis
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # Redis 캐시
+  redis:
+    image: redis:7-alpine
+    container_name: incheon-notice-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Spring Boot 백엔드
   backend:
@@ -103,6 +104,8 @@ services:
       - "5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/pgpass:ro
     depends_on:
       - postgres
 
@@ -134,24 +137,9 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
 
-
-  # treafik:
-  #   image: traefik:latest
-  #   container_name: incheon-notice-traefik
-  #   command:
-  #     - "--api.insecure=true"
-  #     - "--providers.docker=true"
-  #     - "--entrypoints.web.address=:80"
-  #   ports:
-  #     - "80:80"
-  #     - "8081:8080"  # Traefik 대시보드 포트
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-
-      
 volumes:
-  # postgres_data:
-  # redis_data:
+  postgres_data:
+  redis_data:
   pgadmin_data:
   grafana_data:
   prometheus_data:
