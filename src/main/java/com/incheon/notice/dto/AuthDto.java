@@ -35,6 +35,10 @@ public class AuthDto {
         @NotBlank(message = "이름은 필수입니다")
         @Size(max = 50, message = "이름은 최대 50자입니다")
         private String name;
+
+        @NotBlank(message = "학과명은 필수입니다")
+        @Size(max = 100, message = "학과명은 최대 100자입니다")
+        private String departmentName;
     }
 
     /**
@@ -103,6 +107,7 @@ public class AuthDto {
         private String email;
         private String name;
         private String role;
+        private String departmentName;  // 학과명
     }
 
     /**

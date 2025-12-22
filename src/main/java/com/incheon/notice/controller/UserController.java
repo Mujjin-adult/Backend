@@ -44,7 +44,17 @@ public class UserController {
      * 사용자 시스템 알림 설정 수정
      * PUT /api/users/settings
      */
-    @Operation(summary = "사용자 시스템 알림 설정 수정", description = "시스템 알림 활성화/비활성화 설정을 변경합니다.")
+    @Operation(
+            summary = "푸시 알림 전체 끄기/켜기",
+            description = """
+                    모든 푸시 알림의 수신 여부를 설정합니다.
+
+                    - **활성화 (true)**: 키워드 알림, 중요 공지 알림 등 모든 푸시 알림을 받습니다.
+                    - **비활성화 (false)**: 모든 푸시 알림을 받지 않습니다.
+
+                    개별 키워드의 알림은 `/api/keywords/{id}/toggle`에서 별도로 관리할 수 있습니다.
+                    """
+    )
     @PutMapping("/settings")
     public ResponseEntity<ApiResponse<UserDto.Response>> updateSettings(
             @Valid @RequestBody UserDto.UpdateSettingsRequest request) {

@@ -47,7 +47,20 @@
       "Bash(time curl:*)",
       "Bash(for i in 1 2 3 4 5)",
       "Bash(do echo \"요청 $i:\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(TOKEN='eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0ZXN0dXNlcjk5QGludS5hYy5rciIsInVzZXJJZCI6MzYsInR5cGUiOiJzZXJ2ZXIiLCJpYXQiOjE3NjYzODY5NTQsImV4cCI6MTc2NjQ3MzM1NH0.xUMvZoqTVnOKJ_K08DCQxbD6rwMJry3lCnUzledrEpEfx8-nMA80ar0JJYGpDFaVDv8cw84faJ4L8ByC734mVQ')",
+      "WebFetch(domain:jiyumi00.tistory.com)",
+      "Bash(__NEW_LINE__ echo \"=== 1. 키워드 목록 조회 (빈 목록) ===\")",
+      "Bash(__NEW_LINE__ echo \"\")",
+      "Bash('http://localhost:8080/api/keywords' )",
+      "Bash(__NEW_LINE__ echo \"=== 5. 키워드 토글 (장학금 비활성화) ===\")",
+      "Bash(__NEW_LINE__ echo \"=== 1. 빈 키워드 ===\")",
+      "Bash('http://localhost:8080/api/keywords' -d '{\"\"keyword\"\": \"\"\"\"}')",
+      "Bash('http://localhost:8080/api/keywords' -d '{\"\"keyword\"\": \"\"   \"\"}')",
+      "Bash('http://localhost:8080/api/keywords' -d '{}')",
+      "Bash(__NEW_LINE__ echo \"=== categoryId: 0 으로 요청 ===\")"
     ],
     "deny": [],
     "ask": []
