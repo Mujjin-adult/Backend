@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Incheon Notice DB",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "incheon_notice",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}
