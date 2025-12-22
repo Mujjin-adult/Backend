@@ -10,6 +10,7 @@
 4. 크롤링용 인스턴스 (보류)
 5. 인스턴스 그룹 생성
    1. lb 연결
+   2. IAM Compute Engine Service Agent에 태그 사용자 역할추가
 
 
 ### VPC
