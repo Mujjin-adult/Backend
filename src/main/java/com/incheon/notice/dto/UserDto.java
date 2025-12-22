@@ -1,5 +1,6 @@
 package com.incheon.notice.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -41,8 +42,13 @@ public class UserDto {
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(description = "푸시 알림 전체 설정 요청")
     public static class UpdateSettingsRequest {
 
+        @Schema(
+                description = "푸시 알림 전체 활성화 여부 (true: 모든 알림 받기, false: 모든 알림 끄기)",
+                example = "true"
+        )
         private Boolean systemNotificationEnabled;
     }
 
