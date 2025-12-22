@@ -1,19 +1,15 @@
 package com.incheon.notice.config;
 
-import com.incheon.notice.security.JwtAuthenticationFilter;
+import com.incheon.notice.security.FirebaseAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -27,7 +23,7 @@ import java.util.List;
 
 /**
  * Spring Security 설정
- * JWT 기반 인증 및 권한 관리
+ * Firebase Authentication 기반 인증 및 권한 관리
  */
 @Configuration
 @EnableWebSecurity
@@ -35,34 +31,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final UserDetailsService userDetailsService;
+    private final FirebaseAuthenticationFilter firebaseAuthenticationFilter;
 
     /**
      * 비밀번호 암호화기 (BCrypt)
+     * Firebase Authentication 사용하지만 회원가입 시 임시 비밀번호 저장에 필요
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
-    }
-
-    /**
-     * 인증 관리자
-     */
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
-    }
-
-    /**
-     * 인증 제공자
-     */
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
-        return authProvider;
     }
 
     /**
@@ -71,7 +48,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF 비활성화 (JWT 사용 시 필요 없음)
+                // CSRF 비활성화 (Stateless API 사용 시 필요 없음)
                 .csrf(AbstractHttpConfigurer::disable)
 
                 // CORS 설정
@@ -85,23 +62,29 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 인증 없이 접근 가능한 경로
                         .requestMatchers("/api/auth/**").permitAll()  // 로그인, 회원가입
-                        .requestMatchers("/api/categories/**").permitAll()  // 카테고리 조회
-                        .requestMatchers(HttpMethod.GET, "/api/notices/**").permitAll()  // 공지사항 조회
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()  // Swagger
-                        .requestMatchers("/actuator/**").permitAll()  // Actuator (운영 환경에서는 제한 필요)
+                        .requestMatchers(HttpMethod.GET, "/api/notices").permitAll()  // 공지사항 목록 조회
+                        .requestMatchers(HttpMethod.GET, "/api/notices/{noticeId}").permitAll()  // 공지사항 상세 조회
+                        .requestMatchers(HttpMethod.GET, "/api/search").permitAll()  // 검색 API
 
-                        // 크롤러 API (내부 통신용, 운영 환경에서는 IP 제한 필요)
-                        .requestMatchers("/api/crawler/**").permitAll()
+                        // Swagger UI 관련 경로 (모든 경로 포함)
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/swagger-resources/**",
+                                "/webjars/**",
+                                "/configuration/**"
+                        ).permitAll()
+
+                        .requestMatchers("/actuator/**").permitAll()  // Actuator (운영 환경에서는 제한 필요)
+                        .requestMatchers("/error").permitAll()  // Spring Boot 에러 페이지
 
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )
 
-                // 인증 제공자 설정
-                .authenticationProvider(authenticationProvider())
-
-                // JWT 필터 추가
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                // Firebase Authentication 필터 추가
+                .addFilterBefore(firebaseAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

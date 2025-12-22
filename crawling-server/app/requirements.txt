@@ -1,18 +1,49 @@
+# FastAPI 웹 프레임워크
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
+
+# 데이터베이스
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Redis 및 Celery
 redis==5.0.1
 celery==5.3.4
-flower==2.0.1
+
+# HTTP 클라이언트 및 파싱
 requests==2.31.0
 beautifulsoup4==4.12.2
 lxml==4.9.3
+
+# 동적 렌더링 크롤링
 playwright==1.40.0
+
+# 설정 관리
 pydantic==2.5.0
 pydantic-settings==2.1.0
+
+# 모니터링 및 로깅
 prometheus-client==0.22.1
 sentry-sdk==2.34.1
+
+# 환경변수
 python-dotenv==1.0.0
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-alembic==1.13.0
+
+# 테스트
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+httpx==0.25.2  # FastAPI TestClient 용
+
+# 코드 품질
+black==23.12.1
+flake8==6.1.0
+mypy==1.7.1
+isort==5.13.2
+
+# 타입 힌트
+types-redis==4.6.0.11
+types-requests==2.31.0.10

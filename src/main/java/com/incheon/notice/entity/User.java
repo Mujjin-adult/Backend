@@ -13,7 +13,8 @@ import java.util.List;
 @Entity
 @Table(name = "users", indexes = {
     @Index(name = "idx_email", columnList = "email"),
-    @Index(name = "idx_student_id", columnList = "student_id")
+    @Index(name = "idx_student_id", columnList = "student_id"),
+    @Index(name = "idx_firebase_uid", columnList = "firebase_uid")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -25,8 +26,11 @@ public class User extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 20)
-    private String studentId;  // 학번
+    @Column(unique = true, length = 20)
+    private String studentId;  // 학번 (nullable - 나중에 입력 가능)
+
+    @Column(unique = true, length = 50)
+    private String firebaseUid;  // Firebase Authentication UID (nullable - 레거시 회원가입 시 null)
 
     @Column(nullable = false, unique = true, length = 100)
     private String email;  // 이메일
@@ -48,6 +52,18 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     @Builder.Default
     private Boolean isActive = true;  // 활성 상태
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean systemNotificationEnabled = true;  // 시스템 알림 허용/미허용
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;  // 소속 학과
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isEmailVerified = false;  // 이메일 인증 여부
 
     // 사용자가 저장한 북마크 목록 (양방향 관계)
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -79,6 +95,64 @@ public class User extends BaseEntity {
     public void updateInfo(String name, String email) {
         this.name = name;
         this.email = email;
+    }
+
+    /**
+     * 시스템 알림 설정 변경
+     */
+    public void updateSystemNotification(Boolean enabled) {
+        this.systemNotificationEnabled = enabled;
+    }
+
+    /**
+     * 사용자 시스템 알림 설정 업데이트
+     */
+    public void updateSettings(Boolean systemNotificationEnabled) {
+        if (systemNotificationEnabled != null) {
+            this.systemNotificationEnabled = systemNotificationEnabled;
+        }
+    }
+
+    /**
+     * 이름 변경
+     */
+    public void updateName(String name) {
+        this.name = name;
+    }
+
+    /**
+     * 학과 변경
+     */
+    public void updateDepartment(Department department) {
+        this.department = department;
+    }
+
+    /**
+     * 계정 비활성화
+     */
+    public void deactivate() {
+        this.isActive = false;
+    }
+
+    /**
+     * 이메일 인증 완료 처리
+     */
+    public void verifyEmail() {
+        this.isEmailVerified = true;
+    }
+
+    /**
+     * 학번 설정 (Firebase 로그인 후 학번 입력 시)
+     */
+    public void updateStudentId(String studentId) {
+        this.studentId = studentId;
+    }
+
+    /**
+     * Firebase UID 설정
+     */
+    public void updateFirebaseUid(String firebaseUid) {
+        this.firebaseUid = firebaseUid;
     }
 }
 

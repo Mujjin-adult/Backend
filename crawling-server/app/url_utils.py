@@ -150,10 +150,9 @@ class URLNormalizer:
 class DuplicateChecker:
     """URL 중복 체크"""
 
-    def __init__(self, storage_backend: Optional[str] = None, max_urls: int = 100000):
+    def __init__(self, storage_backend: Optional[str] = None):
         self.storage_backend = storage_backend or "memory"
         self.normalizer = URLNormalizer()
-        self.max_urls = max_urls  # 메모리 누수 방지를 위한 최대 URL 수
 
         if self.storage_backend == "memory":
             self._seen_urls: Set[str] = set()
@@ -182,12 +181,6 @@ class DuplicateChecker:
         url_hash = self._get_url_hash(normalized)
 
         if self.storage_backend == "memory":
-            # 메모리 누수 방지: 최대 크기 초과 시 50% 제거
-            if len(self._seen_urls) >= self.max_urls:
-                # 가장 오래된 항목부터 제거 (단순하게 절반 제거)
-                to_remove = len(self._seen_urls) // 2
-                self._seen_urls = set(list(self._seen_urls)[to_remove:])
-
             self._seen_urls.add(url_hash)
         elif self.storage_backend == "redis":
             # TODO: Redis에 저장

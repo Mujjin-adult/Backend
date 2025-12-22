@@ -3,9 +3,6 @@ package com.incheon.notice.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * 카테고리 엔티티
  * 학과, 대학, 행정부서 등의 공지사항 카테고리
@@ -44,11 +41,6 @@ public class Category extends BaseEntity {
 
     @Column(length = 500)
     private String description;  // 설명
-
-    // 이 카테고리에 속한 공지사항 목록
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
-    @Builder.Default
-    private List<Notice> notices = new ArrayList<>();
 
     /**
      * 카테고리 정보 수정

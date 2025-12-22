@@ -2,6 +2,16 @@
 
 인천대학교 학생들을 위한 공지사항 통합 플랫폼의 백엔드 시스템입니다.
 
+## 📊 현재 프로젝트 상태
+
+✅ **Phase 1-2 완료** (2024-11-15)
+- 전체 15개 핵심 API 구현 및 테스트 완료 (100% PASS)
+- RESTful HTTP 상태 코드 개선 (409, 401, 400 등)
+- Swagger UI 완전 설정 및 문서화
+- 인증, 사용자, 북마크, 카테고리, 공지사항 기능 완료
+
+🚀 **다음 단계**: Phase 3 - FCM 푸시 알림 시스템 구현
+
 ## 시스템 아키텍처
 
 ```
@@ -134,12 +144,18 @@ docker-compose logs -f crawler
 
 실행 후 다음 URL에서 서비스에 접속할 수 있습니다:
 
-- **Swagger API 문서**: http://localhost:8080/swagger-ui/index.html
+- **Swagger API 문서**: http://localhost:8080/swagger-ui.html ⭐ **API 테스트 추천**
 - **백엔드 API**: http://localhost:8080/api
 - **크롤러 API**: http://localhost:8000
-- **pgAdmin (데이터베이스 관리)**: http://localhost:5050 (admin@admin.com/admin) ⭐ 추천
+- **pgAdmin (데이터베이스 관리)**: http://localhost:5050 (admin@admin.com/admin) ⭐ DB 관리 추천
 - **Grafana 대시보드**: http://localhost:3000 (admin/admin)
 - **Prometheus**: http://localhost:9090
+
+> 💡 **Swagger UI 사용법**:
+> 1. `/api/auth/login`으로 로그인하여 `accessToken` 획득
+> 2. 우측 상단 **"Authorize"** 버튼 클릭
+> 3. `Bearer {accessToken}` 입력 후 인증 완료
+> 4. 모든 API를 브라우저에서 바로 테스트 가능!
 
 > 💡 **pgAdmin 사용법**: 자세한 설정 방법은 `PGADMIN_GUIDE.md` 파일을 참고하세요!
 
@@ -239,6 +255,92 @@ curl -X GET http://localhost:8080/api/notices \
 ```
 
 더 많은 API 예시는 Swagger 문서를 참고하세요!
+
+## 🧪 API 테스트
+
+### 자동화된 테스트 스크립트
+
+프로젝트에는 3가지 테스트 스크립트가 포함되어 있습니다:
+
+#### 1. 간단한 API 테스트 (5분)
+```bash
+chmod +x test_apis.sh
+./test_apis.sh
+```
+기본적인 회원가입, 로그인, 북마크, 카테고리 구독 등을 테스트합니다.
+
+#### 2. 종합 API 테스트 (15개 테스트)
+```bash
+chmod +x comprehensive_api_test.sh
+./comprehensive_api_test.sh
+```
+모든 핵심 API를 체계적으로 테스트하고 결과를 출력합니다.
+
+#### 3. HTTP 상태 코드 검증 테스트
+```bash
+chmod +x test_http_status_codes.sh
+./test_http_status_codes.sh
+```
+RESTful API 표준에 맞게 HTTP 상태 코드가 반환되는지 검증합니다.
+
+### 테스트 결과 (2024-11-15)
+
+✅ **전체 15개 API 테스트: 100% PASS**
+
+| 테스트 | HTTP 상태 | 결과 |
+|--------|----------|------|
+| 회원가입 | 201 Created | ✅ |
+| 중복 회원가입 | 409 Conflict | ✅ |
+| 로그인 | 200 OK | ✅ |
+| 잘못된 비밀번호 로그인 | 401 Unauthorized | ✅ |
+| 내 정보 조회 (인증 O) | 200 OK | ✅ |
+| 내 정보 조회 (인증 X) | 403 Forbidden | ✅ |
+| 사용자 설정 변경 | 200 OK | ✅ |
+| 카테고리 목록 조회 | 200 OK | ✅ |
+| 카테고리 구독 | 201 Created | ✅ |
+| 내 구독 목록 조회 | 200 OK | ✅ |
+| 북마크 목록 조회 | 200 OK | ✅ |
+| 공지사항 목록 조회 | 200 OK | ✅ |
+| 공지사항 검색 | 200 OK | ✅ |
+| 토큰 갱신 | 200 OK | ✅ |
+| Swagger UI 접근 | 302 Redirect | ✅ |
+
+**상세 결과**: `API_TEST_RESULTS.md` 파일 참고
+
+## 📝 주요 개선 사항
+
+### HTTP 상태 코드 RESTful 표준 준수
+
+비즈니스 로직 에러를 적절한 HTTP 상태 코드로 반환하도록 개선했습니다:
+
+- **409 Conflict**: 중복 리소스 (이메일, 학번)
+- **401 Unauthorized**: 인증 실패 (잘못된 비밀번호)
+- **400 Bad Request**: 잘못된 요청 (Validation 실패, 비즈니스 규칙 위반)
+- **403 Forbidden**: 권한 없음 (미인증 접근)
+
+**Before (개선 전):**
+```
+중복 이메일로 회원가입 → HTTP 500 Internal Server Error ❌
+```
+
+**After (개선 후):**
+```
+중복 이메일로 회원가입 → HTTP 409 Conflict ✅
+```
+
+**상세 내용**: `HTTP_STATUS_CODES_FIX.md` 파일 참고
+
+### Custom Exception 클래스 추가
+
+```java
+DuplicateResourceException.java   // 409 Conflict
+InvalidCredentialsException.java  // 401 Unauthorized
+BusinessException.java            // 400 Bad Request
+```
+
+### GlobalExceptionHandler 개선
+
+모든 예외를 체계적으로 처리하여 일관된 에러 응답을 제공합니다.
 
 ## 크롤링 서버 사용법
 

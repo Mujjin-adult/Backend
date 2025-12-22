@@ -25,7 +25,7 @@ public interface NotificationHistoryRepository extends JpaRepository<Notificatio
     /**
      * 사용자가 특정 공지사항에 대한 알림을 받았는지 확인
      */
-    boolean existsByUserIdAndNoticeId(Long userId, Long noticeId);
+    boolean existsByUserIdAndCrawlNoticeId(Long userId, Long crawlNoticeId);
 
     /**
      * 특정 기간 동안 전송된 알림 이력 조회

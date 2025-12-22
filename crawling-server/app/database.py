@@ -1,38 +1,33 @@
-"""
-PostgreSQL 데이터베이스 연결 설정
-"""
-import os
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import QueuePool
+from contextlib import contextmanager
+import logging
 
-load_dotenv()
+from app.config import get_database_url
+from app.models import Base
 
-# PostgreSQL 연결 URL
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@host.docker.internal:5432/incheon_notice"
-)
+logger = logging.getLogger(__name__)
 
-# SQLAlchemy 엔진 생성
+# 환경변수에서 데이터베이스 URL 가져오기
+DATABASE_URL = get_database_url()
+
+# 엔진 생성 (커넥션 풀 설정 포함)
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,  # 연결 유효성 체크
-    pool_size=10,        # 커넥션 풀 크기
-    max_overflow=20,     # 최대 오버플로우
-    echo=False           # SQL 로그 출력 (개발 시 True)
+    poolclass=QueuePool,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,
+    pool_recycle=3600,
 )
 
-# 세션 팩토리
+# 세션 팩토리 생성
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base 클래스
-Base = declarative_base()
 
 
 def get_db():
-    """데이터베이스 세션 생성"""
+    """데이터베이스 세션을 반환하는 제너레이터"""
     db = SessionLocal()
     try:
         yield db
@@ -40,8 +35,36 @@ def get_db():
         db.close()
 
 
-def init_db():
-    """데이터베이스 초기화 (테이블 생성)"""
-    # 이미 Spring Boot에서 테이블이 생성되어 있으므로 실행하지 않음
-    # Base.metadata.create_all(bind=engine)
-    pass
+@contextmanager
+def get_db_context():
+    """컨텍스트 매니저로 데이터베이스 세션 관리"""
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def create_tables():
+    """모든 테이블 생성"""
+    Base.metadata.create_all(bind=engine)
+
+
+def drop_tables():
+    """모든 테이블 삭제 (개발용)"""
+    Base.metadata.drop_all(bind=engine)
+
+
+def init_database():
+    """데이터베이스 초기화"""
+    try:
+        create_tables()
+        print("Database tables created successfully")
+        return True
+    except Exception as e:
+        print(f"Failed to create database tables: {e}")
+        return False

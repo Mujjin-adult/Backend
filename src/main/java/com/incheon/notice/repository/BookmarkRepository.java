@@ -9,7 +9,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 북마크 Repository
@@ -25,21 +27,39 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
     /**
      * 사용자 ID로 북마크 목록 조회
      */
-    @Query("SELECT b FROM Bookmark b JOIN FETCH b.notice WHERE b.user.id = :userId ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Bookmark b JOIN FETCH b.crawlNotice WHERE b.user.id = :userId ORDER BY b.createdAt DESC")
     Page<Bookmark> findByUserIdWithNotice(@Param("userId") Long userId, Pageable pageable);
 
     /**
      * 사용자가 특정 공지사항을 북마크했는지 확인
      */
-    boolean existsByUserIdAndNoticeId(Long userId, Long noticeId);
+    boolean existsByUserIdAndCrawlNoticeId(Long userId, Long crawlNoticeId);
 
     /**
      * 사용자와 공지사항으로 북마크 조회
      */
-    Optional<Bookmark> findByUserIdAndNoticeId(Long userId, Long noticeId);
+    Optional<Bookmark> findByUserIdAndCrawlNoticeId(Long userId, Long crawlNoticeId);
 
     /**
      * 사용자의 북마크 개수
      */
     long countByUserId(Long userId);
+
+    /**
+     * 사용자 이메일과 공지사항 ID로 북마크 존재 여부 확인
+     */
+    boolean existsByUser_EmailAndCrawlNotice_Id(String email, Long crawlNoticeId);
+
+    /**
+     * 사용자 이메일로 북마크된 공지사항 ID 목록 조회 (배치 조회용)
+     * N+1 쿼리 문제 해결을 위한 메서드
+     */
+    @Query("SELECT b.crawlNotice.id FROM Bookmark b WHERE b.user.email = :email AND b.crawlNotice.id IN :noticeIds")
+    Set<Long> findBookmarkedNoticeIdsByUserEmail(@Param("email") String email, @Param("noticeIds") List<Long> noticeIds);
+
+    /**
+     * 사용자 ID로 북마크된 공지사항 ID 목록 조회 (배치 조회용)
+     */
+    @Query("SELECT b.crawlNotice.id FROM Bookmark b WHERE b.user.id = :userId AND b.crawlNotice.id IN :noticeIds")
+    Set<Long> findBookmarkedNoticeIdsByUserId(@Param("userId") Long userId, @Param("noticeIds") List<Long> noticeIds);
 }
