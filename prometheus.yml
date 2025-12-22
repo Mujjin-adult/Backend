@@ -8,6 +8,10 @@ scrape_configs:
     gce_sd_configs:
       - project: 'project-f2639456-81ab-4842-bc5'
         zone: 'asia-northeast3-a'
+      - project: 'project-f2639456-81ab-4842-bc5'
+        zone: 'asia-northeast3-b'
+      - project: 'project-f2639456-81ab-4842-bc5'
+        zone: 'asia-northeast3-c'
 
     relabel_configs:
       # springboot-backend 태그가 있는 인스턴스만 유지
