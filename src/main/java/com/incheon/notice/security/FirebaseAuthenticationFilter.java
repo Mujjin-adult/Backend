@@ -19,8 +19,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * Firebase Authentication 필터
- * 요청의 Authorization 헤더에서 Firebase ID Token을 추출하고 검증
+ * 인증 필터
+ * 요청의 Authorization 헤더에서 토큰을 추출하고 검증
+ *
+ * 지원하는 토큰:
+ * 1. 서버 JWT 토큰 (이메일 로그인으로 발급)
+ * 2. Firebase ID Token (Firebase SDK 로그인으로 발급)
  */
 @Slf4j
 @Component
@@ -28,6 +32,7 @@ import java.io.IOException;
 public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
 
     private final FirebaseTokenProvider firebaseTokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService customUserDetailsService;
 
     @Override
@@ -39,36 +44,71 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
             String token = getTokenFromRequest(request);
 
             if (StringUtils.hasText(token)) {
-                // Firebase ID Token 검증
-                FirebaseToken firebaseToken = firebaseTokenProvider.verifyToken(token);
-                String email = firebaseToken.getEmail();
-
-                // 사용자 정보 로드
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
-
-                // Spring Security 인증 객체 생성
-                UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                    );
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                // SecurityContext에 인증 정보 설정
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-
-                log.debug("Firebase authentication set for user: {}", email);
+                // 1. 먼저 서버 JWT 토큰인지 확인
+                if (jwtTokenProvider.validateToken(token)) {
+                    authenticateWithServerJwt(token, request);
+                } else {
+                    // 2. Firebase ID Token 검증 시도
+                    authenticateWithFirebase(token, request);
+                }
             }
         } catch (FirebaseAuthException e) {
-            log.error("Firebase authentication failed: {}", e.getMessage());
-            // 인증 실패 시 SecurityContext를 비움 (401 응답)
+            log.debug("Failed to verify Firebase token: {}", e.getMessage());
             SecurityContextHolder.clearContext();
         } catch (Exception e) {
-            log.error("Cannot set user authentication: {}", e.getMessage());
+            log.debug("Cannot set user authentication: {}", e.getMessage());
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 서버 JWT 토큰으로 인증
+     */
+    private void authenticateWithServerJwt(String token, HttpServletRequest request) {
+        String email = jwtTokenProvider.getEmailFromToken(token);
+
+        // 사용자 정보 로드
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+
+        // Spring Security 인증 객체 생성
+        UsernamePasswordAuthenticationToken authentication =
+            new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+            );
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+        // SecurityContext에 인증 정보 설정
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        log.debug("Server JWT authentication set for user: {}", email);
+    }
+
+    /**
+     * Firebase ID Token으로 인증
+     */
+    private void authenticateWithFirebase(String token, HttpServletRequest request) throws FirebaseAuthException {
+        FirebaseToken firebaseToken = firebaseTokenProvider.verifyToken(token);
+        String email = firebaseToken.getEmail();
+
+        // 사용자 정보 로드
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+
+        // Spring Security 인증 객체 생성
+        UsernamePasswordAuthenticationToken authentication =
+            new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+            );
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+        // SecurityContext에 인증 정보 설정
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        log.debug("Firebase authentication set for user: {}", email);
     }
 
     /**
