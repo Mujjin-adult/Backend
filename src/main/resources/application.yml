@@ -83,6 +83,9 @@ management:
     web:
       exposure:
         include: health,info,prometheus,metrics
+  health:
+    mail:
+      enabled: false  # Mail 인증 정보 없이도 헬스체크 통과하도록 비활성화
   metrics:
     export:
       prometheus:
