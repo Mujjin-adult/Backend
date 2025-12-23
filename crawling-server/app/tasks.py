@@ -39,7 +39,7 @@ celery_app.conf.update(
     accept_content=["json"],
     result_serializer="json",
     timezone="Asia/Seoul",
-    enable_utc=True,
+    enable_utc=False,  # 한국 시간 기준으로 스케줄 실행
     task_track_started=True,
     task_time_limit=30 * 60,  # 30분
     task_soft_time_limit=25 * 60,  # 25분

@@ -52,6 +52,9 @@ public class CrawlNotice extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String raw;  // 원본 HTML (필요시)
 
+    @Column(columnDefinition = "jsonb")
+    private String extracted;  // 크롤링 추출 데이터 (JSON) - FastAPI 크롤러와 호환
+
     // ==================== 공지사항 기본 정보 ====================
 
     @Column(columnDefinition = "TEXT")
