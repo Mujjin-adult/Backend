@@ -59,6 +59,26 @@ college_crawler = get_college_crawler()
 PRIORITY_MAP = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
 
 
+def get_category_id_for_item(db, item):
+    """
+    Get or create category_id for a crawled item
+    
+    Args:
+        db: Database session
+        item: Crawled item dictionary containing 'category' field
+    
+    Returns:
+        int or None: category_id if category exists, None otherwise
+    """
+    category_id = None
+    category_name = item.get('category')
+    if category_name:
+        detail_category = get_or_create_detail_category(db, category_name)
+        if detail_category:
+            category_id = detail_category.id
+    return category_id
+
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
 def college_crawl_task(self, job_name: str):
     """대학 공지사항 크롤링 태스크"""
@@ -125,13 +145,8 @@ def college_crawl_task(self, job_name: str):
                             fingerprint_str = f"{item_url}_{item.get('title', '')}"
                             fingerprint = hashlib.sha256(fingerprint_str.encode()).hexdigest()
 
-                            # category_id 조회 또는 생성
-                            category_id = None
-                            category_name = item.get('category')
-                            if category_name:
-                                detail_category = get_or_create_detail_category(db, category_name)
-                                if detail_category:
-                                    category_id = detail_category.id
+                            # Get or create category_id
+                            category_id = get_category_id_for_item(db, item)
 
                             # 문서 데이터 생성
                             doc_data = {
@@ -207,13 +222,8 @@ def college_crawl_task(self, job_name: str):
                             fingerprint_str = f"{item_url}_{item.get('title', '')}"
                             fingerprint = hashlib.sha256(fingerprint_str.encode()).hexdigest()
 
-                            # category_id 조회 또는 생성
-                            category_id = None
-                            category_name = item.get('category')
-                            if category_name:
-                                detail_category = get_or_create_detail_category(db, category_name)
-                                if detail_category:
-                                    category_id = detail_category.id
+                            # Get or create category_id
+                            category_id = get_category_id_for_item(db, item)
 
                             # 문서 데이터 생성
                             doc_data = {
