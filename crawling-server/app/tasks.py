@@ -11,7 +11,7 @@ import logging
 from config import get_redis_url, get_crawler_config
 from database import get_db_context
 from models import CrawlNotice
-from crud import create_task, update_task_status, increment_task_retries, create_document, bulk_create_documents, get_job_by_name, get_document_by_url, sync_detail_categories
+from crud import create_task, update_task_status, increment_task_retries, create_document, bulk_create_documents, get_job_by_name, get_document_by_url, sync_detail_categories, get_or_create_detail_category
 from robots_parser import RobotsManager
 from rate_limiter import get_rate_limiter
 from url_utils import get_duplicate_checker, get_url_normalizer
@@ -125,6 +125,14 @@ def college_crawl_task(self, job_name: str):
                             fingerprint_str = f"{item_url}_{item.get('title', '')}"
                             fingerprint = hashlib.sha256(fingerprint_str.encode()).hexdigest()
 
+                            # category_id 조회 또는 생성
+                            category_id = None
+                            category_name = item.get('category')
+                            if category_name:
+                                detail_category = get_or_create_detail_category(db, category_name)
+                                if detail_category:
+                                    category_id = detail_category.id
+
                             # 문서 데이터 생성
                             doc_data = {
                                 "job_id": job_id,
@@ -134,6 +142,7 @@ def college_crawl_task(self, job_name: str):
                                 "date": item.get('date'),
                                 "hits": item.get('hits'),
                                 "category": item.get('category'),
+                                "category_id": category_id,
                                 "source": item.get('source'),
                                 "content": item.get('content', ''),  # 본문 추가
                                 "extracted": item,
@@ -198,6 +207,14 @@ def college_crawl_task(self, job_name: str):
                             fingerprint_str = f"{item_url}_{item.get('title', '')}"
                             fingerprint = hashlib.sha256(fingerprint_str.encode()).hexdigest()
 
+                            # category_id 조회 또는 생성
+                            category_id = None
+                            category_name = item.get('category')
+                            if category_name:
+                                detail_category = get_or_create_detail_category(db, category_name)
+                                if detail_category:
+                                    category_id = detail_category.id
+
                             # 문서 데이터 생성
                             doc_data = {
                                 "job_id": job_id,
@@ -207,6 +224,7 @@ def college_crawl_task(self, job_name: str):
                                 "date": item.get('date'),
                                 "hits": item.get('hits'),
                                 "category": item.get('category'),
+                                "category_id": category_id,
                                 "source": item.get('source'),
                                 "content": item.get('content', ''),  # 본문 추가
                                 "extracted": item,

@@ -554,6 +554,43 @@ def create_detail_category(
     return db_category
 
 
+def get_or_create_detail_category(
+    db: Session,
+    category_name: str
+) -> Optional[DetailCategory]:
+    """
+    카테고리 이름으로 detail_category를 조회하거나 생성
+    
+    Args:
+        db: 데이터베이스 세션
+        category_name: 카테고리 이름
+    
+    Returns:
+        DetailCategory 객체 (실패 시 None)
+    """
+    if not category_name:
+        return None
+    
+    # 기존 카테고리 조회
+    category = get_detail_category_by_name(db, category_name)
+    
+    # 없으면 새로 생성
+    if not category:
+        try:
+            category = create_detail_category(
+                db,
+                name=category_name,
+                description=f"자동 생성: {category_name} 관련 공지"
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create detail_category: {category_name}, error={e}")
+            return None
+    
+    return category
+
+
 def sync_detail_categories(db: Session) -> Dict[str, Any]:
     """
     crawl_notice의 category 값을 detail_category 테이블에 동기화
