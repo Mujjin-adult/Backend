@@ -201,6 +201,9 @@ class CollegeCrawler:
             a = row.select_one("a")
             if not a:
                 return None
+            # "새글" 표시 span 태그 제거 후 텍스트 추출
+            for new_span in a.select("span.new"):
+                new_span.decompose()
             title = a.get_text(strip=True)
             href = a.get("href", "")
             full_url = f"{self.base_url}{href}" if href.startswith("/") else href
