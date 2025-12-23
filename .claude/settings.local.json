@@ -61,7 +61,9 @@
       "Bash('http://localhost:8080/api/keywords' -d '{\"\"keyword\"\": \"\"   \"\"}')",
       "Bash('http://localhost:8080/api/keywords' -d '{}')",
       "Bash(__NEW_LINE__ echo \"=== categoryId: 0 으로 요청 ===\")",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(ls:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
