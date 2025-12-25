@@ -36,5 +36,5 @@ jobs:
       run: |-
         gcloud compute instance-groups managed rolling-action replace ${{ secrets.MIG_NAME }} \
           --region=${{ secrets.GCP_REGION }} \
-          --max-unavailable=1 \
+          --max-unavailable=50% \
           --max-surge=0
