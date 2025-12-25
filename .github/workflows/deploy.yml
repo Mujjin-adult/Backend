@@ -1,0 +1,40 @@
+name: Deploy to GCP MIG
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. 코드 체크아웃
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    # 2. GCP 인증
+    - name: Google Auth
+      id: auth
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    # 3. Docker 설정
+    - name: Docker configuration
+      run: |-
+        gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+
+    # 4. Docker 이미지 빌드 및 푸시 
+    - name: Build and Push Container
+      run: |-
+        docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ secrets.IMAGE_NAME }}:latest .
+        docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ secrets.IMAGE_NAME }}:latest
+
+    # 5. MIG 롤링 업데이트
+    - name: Rolling Update MIG
+      run: |-
+        gcloud compute instance-groups managed rolling-action replace ${{ secrets.MIG_NAME }} \
+          --region=${{ secrets.GCP_REGION }} \
+          --max-unavailable=1 \
+          --max-surge=1
