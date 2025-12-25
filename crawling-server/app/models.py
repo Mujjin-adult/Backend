@@ -14,6 +14,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -122,7 +123,7 @@ class CrawlNotice(Base):
 
     # 메인 서버 통합을 위한 추가 필드들
     content = Column(Text, nullable=True)  # 공지사항 본문 내용
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())  # 업데이트 시간
+    updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=func.now())  # 업데이트 시간
 
     # 원본 데이터 (deprecated - 하위 호환성 유지)
     extracted = Column(JSON, nullable=True)
@@ -130,7 +131,7 @@ class CrawlNotice(Base):
 
     snapshot_version = Column(String(32), nullable=True)
     fingerprint = Column(String(64), nullable=False, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=datetime.now)
 
     # Relationships
     job = relationship("CrawlJob", back_populates="documents")

@@ -40,7 +40,7 @@ services:
 
   celery-beat:
     build: ./app
-    command: celery -A tasks beat --loglevel=INFO
+    command: celery -A tasks beat --loglevel=INFO --schedule=/tmp/celerybeat-schedule
     volumes:
       - ./app:/app
       - ./alembic.ini:/app/alembic.ini
