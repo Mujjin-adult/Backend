@@ -49,7 +49,7 @@ jobs:
 
    # 배포 후 최대 크기 원복
     - name: Restore Max Size
-     run: |-
+      run: |-
        gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_NAME }} \
          --region=${{ secrets.GCP_REGION }} \
          --max-num-replicas=5
