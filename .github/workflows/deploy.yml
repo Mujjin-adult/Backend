@@ -31,10 +31,25 @@ jobs:
         docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ secrets.IMAGE_NAME }}:latest .
         docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ secrets.IMAGE_NAME }}:latest
 
-    # 5. MIG bluegreen 업데이트
+
+    # 배포 전 최대 크기 임시 증가
+    - name: Increase Max Size
+      run: |-
+        gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_NAME }} \
+         --region=${{ secrets.GCP_REGION }} \
+         --max-num-replicas=8
+
+    # 블루그린  업데이트
     - name: bluegreen Update MIG
       run: |-
-        gcloud compute instance-groups managed rolling-action replace ${{ secrets.MIG_NAME }} \
-          --region=${{ secrets.GCP_REGION }} \
-          --max-unavailable=50% \
-          --max-surge=0
+       gcloud compute instance-groups managed rolling-action replace ${{ secrets.MIG_NAME }} \
+         --region=${{ secrets.GCP_REGION }} \
+         --max-surge=3 \
+         --max-unavailable=0
+
+   # 배포 후 최대 크기 원복
+    - name: Restore Max Size
+     run: |-
+       gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_NAME }} \
+         --region=${{ secrets.GCP_REGION }} \
+         --max-num-replicas=5
