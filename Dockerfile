@@ -16,7 +16,8 @@ FROM eclipse-temurin:17-jre
 WORKDIR /app
 
 # 빌드된 JAR 파일 복사
-COPY --from=build /app/build/libs/*.jar app.jar
+COPY --from=build /app/build/libs/app.jar app.jar
+COPY firebase-credentials.json ./firebase-credentials.json
 
 # 포트 노출
 EXPOSE 8080

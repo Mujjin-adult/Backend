@@ -73,9 +73,9 @@ class CrawlJob(Base):
     max_depth = Column(Integer, default=1)
     robots_policy = Column(Enum(RobotsPolicy), nullable=False)
     status = Column(Enum(JobStatus), default=JobStatus.ACTIVE, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
 
     # Relationships

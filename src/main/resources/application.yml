@@ -8,9 +8,9 @@ spring:
 
   # 데이터베이스 설정 (PostgreSQL)
   datasource:
-    url: jdbc:postgresql://localhost:5432/incheon_notice
-    username: postgres
-    password: postgres
+    url: ${DATABASE_URL} 
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -31,9 +31,9 @@ spring:
   # Redis 설정 (캐싱용)
   data:
     redis:
-      host: localhost
-      port: 6379
-      password: # Redis 비밀번호가 있다면 여기에 입력
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD} # Redis 비밀번호가 있다면 여기에 입력
       timeout: 3000ms
 
   # Email 설정 (SMTP - Gmail 예시)
@@ -67,7 +67,7 @@ jwt:
 # FastAPI 크롤링 서버 URL
 crawler:
   api:
-    url: http://localhost:8000  # FastAPI 서버 주소
+    url: ${CRAWLER_API_URL} # FastAPI 서버 주소
 
 # FCM (Firebase Cloud Messaging) 설정
 fcm:
