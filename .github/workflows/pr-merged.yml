@@ -1,0 +1,43 @@
+name: PR Merged Notification
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  notify-merge:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+    - name: Notify PR Merged
+      run: |
+        TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+        curl -H "Content-Type: application/json" \
+             -d '{
+               "embeds": [{
+               "title": "🎉 Pull Request Merged",
+               "description": "${{ github.event.pull_request.title }}",
+               "color": 15844367,
+               "fields": [
+                 {
+                   "name": "Merged by",
+                   "value": "[@${{ github.event.pull_request.merged_by.login }}](${{ github.event.pull_request.merged_by.html_url }})",
+                   "inline": true
+                 },
+                 {
+                   "name": "Branch",
+                   "value": "`${{ github.event.pull_request.head.ref }}` → `${{ github.event.pull_request.base.ref }}`",
+                   "inline": true
+                 },
+                 {
+                   "name": "Total Changes",
+                   "value": "${{ github.event.pull_request.commits }} commits | +${{ github.event.pull_request.additions }} -${{ github.event.pull_request.deletions }}",
+                   "inline": false
+                 }
+               ],
+               "timestamp": "$TIMESTAMP",
+               "footer": {
+                 "text": "PR #${{ github.event.pull_request.number }} merged"
+               }
+             }]
+           }' \
+        ${{ secrets.DISCORD_WEBHOOK_URL }}

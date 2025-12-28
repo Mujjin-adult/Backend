@@ -117,12 +117,21 @@ jobs:
         run: |-
           gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_NAME }} \
             --region=${{ secrets.GCP_REGION }} \
-            --max-num-replicas=8
+            --max-num-replicas=20
 
+      # ondemand 업데이트
+      - name: ondemand Update MIG
+        run: |-
+          gcloud compute instance-groups managed rolling-action replace ${{ secrets.MIG_NAME }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --max-unavailable=0 \
+            --max-surge=1
+
+            
       # 블루그린 업데이트
       - name: bluegreen Update MIG
         run: |-
-          gcloud compute instance-groups managed rolling-action replace ${{ secrets.MIG_NAME }} \
+          gcloud compute instance-groups managed rolling-action replace ${{ secrets.MIG_SPOT_NAME }} \
             --region=${{ secrets.GCP_REGION }} \
             --max-surge=3 \
             --max-unavailable=0
@@ -132,7 +141,7 @@ jobs:
         run: |-
           gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_NAME }} \
             --region=${{ secrets.GCP_REGION }} \
-            --max-num-replicas=5
+            --max-num-replicas=10
 
       - name: Notify Deployment Success
         if: success()
