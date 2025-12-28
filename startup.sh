@@ -13,7 +13,7 @@ sudo apt-get update
 sudo apt-get install -y docker.io
 
 # 1. Artifact Registry에서 이미지 다운로드
-IMAGE_URL="asia-northeast3-docker.pkg.dev/project-f2639456-81ab-4842-bc5/docker-registry/backend:latest"
+IMAGE_URL="asia-northeast3-docker.pkg.dev/project-f2639456-81ab-4842-bc5/docker-registry/backend2:latest"
 docker pull ${IMAGE_URL}
 
 # 2. Secret Manager에서 비밀 가져오기
@@ -25,6 +25,7 @@ JWT_SECRET=$(gcloud secrets versions access latest --secret="jwt-secret" --proje
 # 3. DB VM의 Private IP (DB VM 생성 후 업데이트 필요)
 # TODO: DB VM 생성 후 이 IP를 실제 Private IP로 변경하세요
 DB_HOST="10.0.1.5"  # 예: 10.178.0.5
+CRAWLER_HOST="10.0.1.2"
 
 # 4. 컨테이너 실행
 #    -d: 백그라운드 실행
@@ -32,7 +33,7 @@ DB_HOST="10.0.1.5"  # 예: 10.178.0.5
 #    --restart=always: VM 재부팅 시 컨테이너 자동 재시작
 #    -e ...: 환경 변수 주입
 docker run -d -p 8080:8080 --restart=always --name backend-app \
-  -e SPRING_PROFILES_ACTIVE="prod" \
+  -e SPRING_PROFILES_ACTIVE="dev" \
   -e DATABASE_URL="jdbc:postgresql://${DB_HOST}:5432/incheon_notice" \
   -e DATABASE_USERNAME="postgres" \
   -e DATABASE_PASSWORD="${DB_PASSWORD}" \
@@ -40,5 +41,5 @@ docker run -d -p 8080:8080 --restart=always --name backend-app \
   -e REDIS_PORT="6379" \
   -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
   -e JWT_SECRET="${JWT_SECRET}" \
-  #-e SPRING_JPA_HIBERNATE_DDL_AUTO="update" \
+  -e CRAWLER_API_URL="http://${CRAWLER_HOST}:8001" \
   ${IMAGE_URL}
