@@ -123,7 +123,7 @@ jobs:
       - name: ondemand Update MIG
         run: |-
           gcloud compute instance-groups managed rolling-action replace ${{ secrets.MIG_NAME }} \
-            --region=${{ secrets.GCP_REGION }} \
+            --zone=${{ secrets.GCP_REGION }}-a \
             --max-unavailable=0 \
             --max-surge=1
 
