@@ -115,7 +115,7 @@ jobs:
       # 배포 전 최대 크기 임시 증가
       - name: Increase Max Size
         run: |-
-          gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_NAME }} \
+          gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_SPOT_NAME }} \
             --region=${{ secrets.GCP_REGION }} \
             --max-num-replicas=20
 
@@ -139,7 +139,7 @@ jobs:
       # 배포 후 최대 크기 원복
       - name: Restore Max Size
         run: |-
-          gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_NAME }} \
+          gcloud compute instance-groups managed set-autoscaling ${{ secrets.MIG_SPOT_NAME }} \
             --region=${{ secrets.GCP_REGION }} \
             --max-num-replicas=10
 
